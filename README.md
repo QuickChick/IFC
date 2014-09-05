@@ -32,7 +32,21 @@
 
 -- Compile
    
-[TODO:update]
    make
         This will compile the coq code. Including any "QuickCheck" command 
         will allow you to run tests (inside or outside emacs).
+
+-- Coqtop and lib paths
+   
+   For Emacs > 23: use directory locals. The example should work:
+   
+   ln -s example.dir-locals.el .dir-locals.el
+
+-- Misc
+   
+   * TMU Table is located at Machine/Machine.v, under "fetch_rule"
+   * The core of the generation strategy weights is under
+     Testing/MachineGen.v, under "ainstr"
+   
+
+   
