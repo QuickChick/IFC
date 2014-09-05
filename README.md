@@ -1,16 +1,16 @@
 IFC Experiments with QuickChick
 ===============================
 
-# Description
+## Description
   - Information Flow Control (IFC) case study using the QuickChick
     testing plugin for Coq. Includes verification of testing and some
     other Coq proofs (see below).
 
-# Known to work with
-  - Coq 8.4pl3
+## Prerequisites
+  - Known to work with Coq 8.4pl3
   - QuickChick plugin (https://github.com/QuickChick/QuickChick)
 
-# Contents
+## Contents
   - Information-flow machine (http://arxiv.org/abs/1409.0393)
     * Labels.v, Lab2.v, Lab4.v, LabSetsOfPrins.v
     * Instructions.v, Memory.v, Rules.v, Machine.v
@@ -28,13 +28,14 @@ IFC Experiments with QuickChick
     * NIProof.v -- a still unfinished noninterference proof
     * Indist.v -- the indistinguishability relation
   - An experiment with representing IFC rules inductively
-    (requires Coq plugin: https://github.com/picnic/RelationExtraction)
+    (requires relation extraction Coq plugin:
+     https://github.com/picnic/RelationExtraction)
     * RelationExtraction.v
 
-# Compiling
+## Compiling
 
-   make
+    make
 
-# Compiling and running tests
+## Compiling and running tests
 
     make && coqc Driver.v
