@@ -1,52 +1,40 @@
--- Works with
+IFC Experiments with QuickChick
+===============================
 
-   + Coq 8.4pl3
-   + QuickChick plugin (git@github.com:QuickChick/QuickChick.git)
+# Description
+  - Information Flow Control (IFC) case study using the QuickChick
+    testing plugin for Coq. Includes verification of testing and some
+    other Coq proofs (see below).
 
--- Features 
+# Known to work with
+  - Coq 8.4pl3
+  - QuickChick plugin (https://github.com/QuickChick/QuickChick)
 
-[TODO:update]
-   New features wrt pico-ifc abstract machine:
+# Contents
+  - Information-flow machine (http://arxiv.org/abs/1409.0393)
+    * Labels.v, Lab2.v, Lab4.v, LabSetsOfPrins.v
+    * Instructions.v, Memory.v, Rules.v, Machine.v
+  - Testing code
+    * Driver.v -- runs the tests
+    * TestingCommon.v, Generation.v, Shrinking.v, Printing.v
+    * Indist.v, Reachability.v, SanityChecks.v, SSNI.v
+    * Mutate.v -- generating mutants for mutation testing
+  - Testing verification proofs    
+    * GenerationProofsHelpers.v
+    * GenerationProofs.v -- CH: broken since 2f9d25043cf
+    * SSNICheckerProofs.v -- CH: broken since 2f9d25043cf
+  - Noninterference proofs
+    * NotionsOfNI.v -- proofs relating various noninterference notions
+    * NIProof.v -- a still unfinished noninterference proof
+    * Indist.v -- the indistinguishability relation
+  - An experiment with representing IFC rules inductively
+    (requires Coq plugin: https://github.com/picnic/RelationExtraction)
+    * RelationExtraction.v
 
-   - public first-class labels
-     + operations producing and/or taking first-class labels:
-       Lab, MLab, PcLab, FlowsTo, LJoin, PutBot
-   - memory frame labels giving us updatable memory labels
-   - brackets
-   - registers
-     + automatically saved and restored on bracket calls and returns
-   - allocation
-     (pico-ifc extension; not present in simplest machine)
-   - Swiss cheese memory model
-     (pico-ifc extension; not present in simplest machine)
-     + with additional separation between code and data frames;
-       instructions are stored in (read-only) code frames only
-   - labels = sets of [pre-allocated] principals
-     (pico-ifc extension; not present in simplest machine)
+# Compiling
 
--- Contents
- 
-[TODO:update]
-   Machine      : Definition of the micro-machine # Is it still micro?
-   Testing      : Testing infrastructure
-
--- Compile
-   
    make
-        This will compile the coq code. Including any "QuickCheck" command 
-        will allow you to run tests (inside or outside emacs).
 
--- Coqtop and lib paths
-   
-   For Emacs > 23: use directory locals. The example should work:
-   
-   ln -s example.dir-locals.el .dir-locals.el
+# Compiling and running tests
 
--- Misc
-   
-   * TMU Table is located at Machine/Machine.v, under "fetch_rule"
-   * The core of the generation strategy weights is under
-     Testing/MachineGen.v, under "ainstr"
-   
-
-   
+    make && coqc Driver.v

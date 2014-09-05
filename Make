@@ -7,7 +7,6 @@ Machine.v
 Memory.v
 Mutate.v
 NIProof.v
-#NIAbstractMachine.v
 #RelationExtraction.v
 Rules.v
 Utils.v
@@ -24,5 +23,6 @@ GenerationProofsHelpers.v
 #GenerationProofs.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
+#Driver.v
 Coqlib.v
 Integers.v

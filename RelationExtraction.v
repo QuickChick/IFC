@@ -1,6 +1,6 @@
 Require Import ZArith List.
 
-Require Export Lattices.
+Require Export Labels.
 Require Export Instructions.
 Require Import Rules.
 
@@ -34,12 +34,8 @@ Inductive table : MVec -> RVec -> Prop :=
 | TBRet : forall pc l1 l2 l3,
   flows (join l1 pc) (join l2 l3) = true ->
   table (MkMVec OpBRet l1 l2 l3 pc) (MkRVec l2 l3)
-| TFlowsTo : forall pc l1 l2 l3,
-  table (MkMVec OpFlowsTo l1 l2 l3 pc) (MkRVec (join l1 l2) pc)
-| TLJoin : forall pc l1 l2 l3,
-  table (MkMVec OpLJoin l1 l2 l3 pc) (MkRVec (join l1 l2) pc)
 | TPutBot : forall pc l1 l2 l3,
-  table (MkMVec OpPutBot l1 l2 l3 pc) (MkRVec bot pc)
+  table (MkMVec OpPutLab l1 l2 l3 pc) (MkRVec bot pc)
 | TNop : forall pc l1 l2 l3,
   table (MkMVec OpNop l1 l2 l3 pc) (MkRVec none pc)
 | TPut : forall pc l1 l2 l3,
@@ -62,10 +58,7 @@ Inductive table : MVec -> RVec -> Prop :=
 | TPGetOff : forall pc l1 l2 l3,
   table (MkMVec OpPGetOff l1 l2 l3 pc) (MkRVec l1 pc)
 | TMSize : forall pc l1 l2 l3,
-  table (MkMVec OpMSize l1 l2 l3 pc) (MkRVec l2 (join pc l1))
-| TOutput : forall pc l1 l2 l3,
-  table (MkMVec OpOutput l1 l2 l3 pc) (MkRVec (join l1 pc) pc)
-.
+  table (MkMVec OpMSize l1 l2 l3 pc) (MkRVec l2 (join pc l1)).
 
 Declare ML Module "relation_extraction_plugin".
 
