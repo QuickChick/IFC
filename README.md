@@ -7,7 +7,7 @@ IFC Experiments with QuickChick
     other Coq proofs (see below).
 
 ## Prerequisites
-  - Known to work with Coq 8.4pl3
+  - Known to work with Coq 8.4pl4
   - QuickChick plugin (https://github.com/QuickChick/QuickChick)
 
 ## Contents
