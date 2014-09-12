@@ -24,5 +24,6 @@ GenerationProofsHelpers.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
 #Driver.v
-Coqlib.v
-Integers.v
+-I compcert
+compcert/Coqlib.v
+compcert/Integers.v
