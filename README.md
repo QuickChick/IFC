@@ -41,8 +41,8 @@ IFC Experiments with QuickChick
     make && coqc Driver.v
 
 ## License
-
   - The files in this directory are distributed under the MIT license
     (see LICENSE)
-  - The files in the compcert directory are distributed under the
-    INRIA Non-Commercial License Agreement (see compcert/LICENSE).
+  - The files in the compcert/lib directory are dual-licensed under
+    the INRIA Non-Commercial License Agreement and the GNU General
+    Public License version 2 or later (see compcert/LICENSE)
