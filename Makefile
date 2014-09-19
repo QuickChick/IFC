@@ -1,4 +1,4 @@
-.PHONY: compile install clean
+.PHONY: compile tests clean
 
 compile: Makefile.coq
 	$(MAKE) -f Makefile.coq

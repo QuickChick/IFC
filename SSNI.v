@@ -20,16 +20,14 @@ Section Checkers.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}.
 
-(*  Definition Property := Property Gen. *)
-
 
   Definition is_low_state st lab := isLow (pc_lab (st_pc st)) lab.
 
 Set Printing All.
 
-  Definition propSSNI_helper (t : table) (v : Variation) : Property Gen :=
+  Definition propSSNI_helper (t : table) (v : Variation) : Checker Gen :=
     let '(Var lab st1 st2) := v in
-    (*  Property.trace (Show.show lab ++ Show.nl ++
+    (*  Checker.trace (Show.show lab ++ Show.nl ++
      showStatePair lab frameMap1 frameMap2 st1 st2) *)
     collect (option_bind opcode_of_instr
                          (instr_lookup (st_imem st1) (st_pc st1)))
@@ -51,12 +49,12 @@ Set Printing All.
 *)
                                      (indist lab st1' st2')(*:Gen QProp*))
                        | _ => (* 1 took a low step and 2 failed *)
-                         collect "Second failed" (property true : Gen QProp)
+                         collect "Second failed" (checker true : Gen QProp)
                      (*
-                ((Property.trace (show_pair lab st1 st1'))
-                (property false))
+                ((Checker.trace (show_pair lab st1 st1'))
+                (checker false))
                       *)
-                     (* XXX This used to fail the property in ICFP paper.
+                     (* XXX This used to fail the checker in ICFP paper.
                   But here it does happen for Alloc, Store and BRet *)
                      end
                    else (* is_high st1 *)
@@ -71,10 +69,10 @@ Set Printing All.
 *)
                                                  (indist lab st1' st2') (* : Gen QProp *)
                                      )
-                           else collect "Second not low" (property true : Gen QProp)
+                           else collect "Second not low" (checker true : Gen QProp)
                          (* This can happen; it's just a discard *)
                          (* TODO: could check that st2' `indist` st1 *)
-                         | _ => collect "Second failed H" (property true : Gen QProp)
+                         | _ => collect "Second failed H" (checker true : Gen QProp)
                        (* This can happen; it's just a discard *)
                        end
                      else
@@ -85,17 +83,17 @@ Set Printing All.
 *)
                                        (indist lab st1 st1')
                                (*: Gen QProp*))
-                 | _ => collect "Failed" (property true : Gen QProp)
+                 | _ => collect "Failed" (checker true : Gen QProp)
                (* This can happen; it's just a discard *)
                (* TODO: could check if st2 does a H -> H step *)
                end
-             else collect "Not indist!" (property true : Gen QProp)).
+             else collect "Not indist!" (checker true : Gen QProp)).
            (* XXX this should never happen with a correct generator;
               and prop_generate_indist already tests this;
               so this should either go away or become (propery false) *)
 
-  Definition propSSNI t : Property Gen :=
-    forAllShrink (fun _ => ""%string) gen_variation_state (fun _ => nil)
+  Definition propSSNI t : Checker Gen :=
+    forAllShrinkShow gen_variation_state (fun _ => nil) (fun _ => ""%string)
       (* shrinkVState *)
       (propSSNI_helper t : @Variation State -> Gen QProp).
 

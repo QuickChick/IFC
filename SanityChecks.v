@@ -20,24 +20,25 @@ Section Checkers.
   Context {Gen : Type -> Type}
           {H : GenMonad Gen}.
 
-  Definition prop_stamp_generation (st : State) : Property Gen :=
-    (* whenFail (show st) *) (property (well_formed st)).
+  Definition prop_stamp_generation (st : State) : Checker Gen :=
+    (* whenFail (show st) *) (checker (well_formed st)).
 
   (*
   Definition propStampGeneration (st : State) :=
     let stamps := generateStamps st in
-    whenFail (Property.trace ("Generated: " ++ nl ++
+    whenFail (Checker.trace ("Generated: " ++ nl ++
                              (showStamps (allocated (st_mem st)) stamps)))
              (wellFormed st stamps).
   *)
 
-  Definition prop_generate_indist : Property Gen :=
-    forAllShrink show gen_variation_state (fun _ => []) (* shrinkVState *)
+  Definition prop_generate_indist : Checker Gen :=
+    forAllShrink gen_variation_state (fun _ => []) (* shrinkVState *)
                  (fun v => let '(Var lab st1 st2) := v in
-                  property (indist lab st1 st2) : Gen QProp).
+                  checker (indist lab st1 st2) : Gen QProp).
 
-  Definition prop_fstep_preserves_well_formed (t : table) : Property Gen :=
-    forAllShrink (* show *)(fun _ => ""%string) arbitrary (fun _ => []) (fun st =>
+  Definition prop_fstep_preserves_well_formed (t : table) : Checker Gen :=
+    forAllShrinkShow arbitrary (fun _ => []) (* show *)(fun _ => ""%string)
+    (fun st =>
     (if well_formed st then
       match fstep t st with
       | Some st' =>
@@ -45,10 +46,10 @@ Section Checkers.
         whenFail ("Initial: " ++ show st ++ nl ++
                   "Step to: " ++ show st' ++ nl)
 *)
-                 (property (well_formed st'))
-      | _ => property rejected
+                 (checker (well_formed st'))
+      | _ => checker rejected
       end
-    else property false) : Gen QProp).
+    else checker false) : Gen QProp).
 
 End Checkers.
 
@@ -57,10 +58,10 @@ Require Import EndToEnd SetOfOutcomes.
 
 (* This is trivial, but it was mentioned below so I've proved it *)
 Lemma prop_stamp_generation_equiv :
-  semTestable (prop_stamp_generation : State -> Pred QProp) <->
+  semCheckable (prop_stamp_generation : State -> Pred QProp) <->
   (forall st, @genState Pred _ st -> well_formed st).
 Proof.
-  rewrite /prop_stamp_generation /semTestable /property /testFun.
+  rewrite /prop_stamp_generation /semCheckable /checker /testFun.
   rewrite semForAllShrink. split => H st gen.
   - specialize (H st gen). by move /semPredQProp/semBool in H.
   - rewrite semPredQProp. apply /semBool. apply H. exact gen.
@@ -70,7 +71,7 @@ Qed.
    TODO both these would become more interesting if we had declarative
         variants of well_formed and indist *)
 Lemma prop_generate_indist_equiv :
-  semTestable (prop_generate_indist : Pred QProp) <->
+  semCheckable (prop_generate_indist : Pred QProp) <->
   (forall lab st1 st2,
      @gen_variation_state Pred _ (Var lab st1 st2) -> indist lab st1 st2).
 Proof.
@@ -95,7 +96,7 @@ Definition fstep_preserves_well_formed : Prop := forall st st',
   well_formed st'.
 
 Lemma prop_fstep_preserves_well_formed_equiv :
-    semProperty (@prop_fstep_preserves_well_formed Pred _ default_table) <->
+    semChecker (@prop_fstep_preserves_well_formed Pred _ default_table) <->
     fstep_preserves_well_formed.
 Proof.
   rewrite /prop_fstep_preserves_well_formed /fstep_preserves_well_formed
@@ -111,5 +112,5 @@ Proof.
     + specialize (H st' arb Logic.eq_refl). rewrite H.
       (* rewrite semWhenFail_id. by rewrite <- semBool. *)
       by apply <- semBool.
-    + fold (semTestable rejected). rewrite semResult. reflexivity.
+    + fold (semCheckable rejected). rewrite semResult. reflexivity.
 Qed.
