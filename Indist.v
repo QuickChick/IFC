@@ -3,7 +3,7 @@ Require Import List.
 Require Import EquivDec.
 Require Import Instructions.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype finset.
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
 Require Import Utils Labels Memory Machine.
 (*Require Import Common.*)

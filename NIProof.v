@@ -1,9 +1,8 @@
 Require Import List. Import ListNotations.
 Require Import String.
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype finset.
-Require Import path fingraph. (* This depends on Mathematical Components 1.5
-                 http://www.msr-inria.fr/projects/mathematical-components-2/ *)
-
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
+Require Import finset path fingraph. (* These depend on Mathematical Components 1.5
+                      http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 Require Import Utils Labels Rules Memory Instructions Machine Indist NotionsOfNI.
 
