@@ -7,7 +7,10 @@ IFC Experiments with QuickChick
     other Coq proofs (see below).
 
 ## Prerequisites
-  - Known to work with Coq 8.4pl4
+  - Coq 8.4pl4 or 8.4pl5
+  - SSReflect 1.5
+  - Mathematical Components 1.5
+    (http://www.msr-inria.fr/projects/mathematical-components-2/)
   - QuickChick plugin (https://github.com/QuickChick/QuickChick)
 
 ## Contents
