@@ -9,9 +9,9 @@ IFC Experiments with QuickChick
 ## Prerequisites
   - Coq 8.4pl4 or 8.4pl5 (https://coq.inria.fr/download)
   - SSReflect 1.5 (http://ssr.msr-inria.inria.fr/FTP/)
-  - Mathematical Components 1.5
-    (http://www.msr-inria.fr/projects/mathematical-components-2/)
   - QuickChick plugin (https://github.com/QuickChick/QuickChick)
+  - Only for `NIProof.v`: Mathematical Components 1.5
+    (http://www.msr-inria.fr/projects/mathematical-components-2/)
 
 ## Contents
   - Information-flow machine (http://arxiv.org/abs/1409.0393)
