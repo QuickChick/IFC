@@ -21,20 +21,20 @@ Require Import SanityChecks.
 
 (* TODO: CH: get rid of all this boilerplate code *)
 Definition test_stamp_generation :=
-  showResult (quickCheck (prop_stamp_generation : State -> Gen.Gen QProp)).
+  showResult (quickCheck prop_stamp_generation).
 QuickCheck test_stamp_generation.
 
 Definition test_generate_indist :=
-  showResult (quickCheck (prop_generate_indist : Gen.Gen QProp)).
+  showResult (quickCheck prop_generate_indist).
 QuickCheck test_generate_indist.
 
 Definition test_fstep_preserves_well_formed :=
-  showResult (quickCheck (prop_fstep_preserves_well_formed default_table : Gen.Gen QProp)).
+  showResult (quickCheck (prop_fstep_preserves_well_formed default_table)).
 QuickCheck test_fstep_preserves_well_formed.
 
 (* Testing non-interference second (default table) *)
 
-Definition testSSNI t := quickCheck (propSSNI t : Gen.Gen QProp).
+Definition testSSNI t := quickCheck (propSSNI t).
 
 Definition testSSNIdefaultTable := showResult (testSSNI default_table).
 
@@ -52,8 +52,7 @@ Instance mutateable_table : Mutateable table :=
 
 Definition testMutants :=
   mutateCheckMany default_table (fun t => [propSSNI t;
-    prop_fstep_preserves_well_formed t] : list (Gen.Gen QProp)
-).
+    prop_fstep_preserves_well_formed t]).
 
 Definition runTestMutants := show testMutants.
 
@@ -113,7 +112,7 @@ Definition testMutant36 := testMutantX
 Definition testMutantWF x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
-  quickCheck (prop_fstep_preserves_well_formed mutant : Gen.Gen QProp).
+  quickCheck (prop_fstep_preserves_well_formed mutant).
 
 Definition testMutant36wf := testMutantWF
   OpAlloc (≪TRUE, Lab2, LabPC ≫).
