@@ -1,4 +1,5 @@
 Require Import QuickChick.
+Import Gen GenComb.
 
 Require Import Reachability.
 Require Import Printing.
@@ -16,11 +17,8 @@ Require Import ssreflect ssrbool eqtype.
 
 Local Open Scope string.
 
-Section Checkers.
-  Context {Gen : Type -> Type}
-          {H : GenMonad Gen}.
 
-  Definition prop_stamp_generation (st : State) : Checker Gen :=
+Definition prop_stamp_generation (st : State) : Checker :=
     (* whenFail (show st) *) (checker (well_formed st)).
 
   (*
@@ -31,12 +29,12 @@ Section Checkers.
              (wellFormed st stamps).
   *)
 
-  Definition prop_generate_indist : Checker Gen :=
+  Definition prop_generate_indist : Checker :=
     forAllShrink gen_variation_state (fun _ => []) (* shrinkVState *)
                  (fun v => let '(Var lab st1 st2) := v in
-                  checker (indist lab st1 st2) : Gen QProp).
+                  checker (indist lab st1 st2)).
 
-  Definition prop_fstep_preserves_well_formed (t : table) : Checker Gen :=
+  Definition prop_fstep_preserves_well_formed (t : table) : Checker :=
     forAllShrinkShow arbitrary (fun _ => []) (* show *)(fun _ => ""%string)
     (fun st =>
     (if well_formed st then
@@ -49,46 +47,43 @@ Section Checkers.
                  (checker (well_formed st'))
       | _ => checker rejected
       end
-    else checker false) : Gen QProp).
-
-End Checkers.
-
-(* Q: Split off into a separate file with Proofs? *)
-Require Import EndToEnd SetOfOutcomes.
+    else checker false)).
 
 (* This is trivial, but it was mentioned below so I've proved it *)
 Lemma prop_stamp_generation_equiv :
-  semCheckable (prop_stamp_generation : State -> Pred QProp) <->
-  (forall st, @genState Pred _ st -> well_formed st).
-Proof.
-  rewrite /prop_stamp_generation /semCheckable /checker /testFun.
-  rewrite semForAllShrink. split => H st gen.
-  - specialize (H st gen). by move /semPredQProp/semBool in H.
-  - rewrite semPredQProp. apply /semBool. apply H. exact gen.
-Qed.
+  semCheckable prop_stamp_generation <->
+  (forall st, semGen genState st -> well_formed st).
+Abort.
+(* Proof. *)
+(*   rewrite /prop_stamp_generation /semCheckable /checker /testFun. *)
+(*   rewrite semForAllShrink. split => H st gen. *)
+(*   - specialize (H st gen). by move /semPredQProp/semBool in H. *)
+(*   - rewrite semPredQProp. apply /semBool. apply H. exact gen. *)
+(* Qed. *)
 
 (* One more rather trivial one;
    TODO both these would become more interesting if we had declarative
         variants of well_formed and indist *)
 Lemma prop_generate_indist_equiv :
-  semCheckable (prop_generate_indist : Pred QProp) <->
+  semCheckable prop_generate_indist <->
   (forall lab st1 st2,
-     @gen_variation_state Pred _ (Var lab st1 st2) -> indist lab st1 st2).
-Proof.
-  rewrite /prop_generate_indist. rewrite semPredQProp.
-  setoid_rewrite semForAllShrink.
-  split => [H lab st1 st2 gen | H [lab st1 st2] gen].
-  - specialize (H (Var lab st1 st2) gen). red in H.
-    by move /semPredQProp/semBool in H.
-  - rewrite semPredQProp. apply semBool. by apply H.
-Qed.
+     semGen gen_variation_state (Var lab st1 st2) -> indist lab st1 st2).
+Abort.
+(* Proof. *)
+(*   rewrite /prop_generate_indist. rewrite semPredQProp. *)
+(*   setoid_rewrite semForAllShrink. *)
+(*   split => [H lab st1 st2 gen | H [lab st1 st2] gen]. *)
+(*   - specialize (H (Var lab st1 st2) gen). red in H. *)
+(*     by move /semPredQProp/semBool in H. *)
+(*   - rewrite semPredQProp. apply semBool. by apply H. *)
+(* Qed. *)
 
 (* One direction of this (soundness) is checked by prop_stamp_generation above;
    this is the high-level spec we need for genState
    TODO: move this to GenerationProofs? *)
 Lemma genState_well_formed : forall st,
-  @genState Pred _ st <-> well_formed st.
-Admitted.
+  semGen genState st <-> well_formed st.
+Abort.
 
 Definition fstep_preserves_well_formed : Prop := forall st st',
   well_formed st ->
@@ -96,21 +91,22 @@ Definition fstep_preserves_well_formed : Prop := forall st st',
   well_formed st'.
 
 Lemma prop_fstep_preserves_well_formed_equiv :
-    semChecker (@prop_fstep_preserves_well_formed Pred _ default_table) <->
+    semChecker (prop_fstep_preserves_well_formed default_table) <->
     fstep_preserves_well_formed.
-Proof.
-  rewrite /prop_fstep_preserves_well_formed /fstep_preserves_well_formed
-    semForAllShrink /arbitrary /arbState. setoid_rewrite semPredQProp.
-  split => [H st st' wf ex | H st arb].
-  - assert (@genState Pred _ st) as gs by (by rewrite genState_well_formed).
-    specialize (H st gs).
-    rewrite wf ex in H.
-    (* by move /semWhenFail_id /semBool in H. *)    
-    by apply semBool in H.
-  - move /genState_well_formed in arb. rewrite arb. specialize (H st).
-    move : H. case (fstep default_table st) => [ st' | ] H.
-    + specialize (H st' arb Logic.eq_refl). rewrite H.
-      (* rewrite semWhenFail_id. by rewrite <- semBool. *)
-      by apply <- semBool.
-    + fold (semCheckable rejected). rewrite semResult. reflexivity.
-Qed.
+Abort.
+(* Proof. *)
+(*   rewrite /prop_fstep_preserves_well_formed /fstep_preserves_well_formed *)
+(*     semForAllShrink /arbitrary /arbState. setoid_rewrite semPredQProp. *)
+(*   split => [H st st' wf ex | H st arb]. *)
+(*   - assert (@genState Pred _ st) as gs by (by rewrite genState_well_formed). *)
+(*     specialize (H st gs). *)
+(*     rewrite wf ex in H. *)
+(*     (* by move /semWhenFail_id /semBool in H. *)     *)
+(*     by apply semBool in H. *)
+(*   - move /genState_well_formed in arb. rewrite arb. specialize (H st). *)
+(*     move : H. case (fstep default_table st) => [ st' | ] H. *)
+(*     + specialize (H st' arb Logic.eq_refl). rewrite H. *)
+(*       (* rewrite semWhenFail_id. by rewrite <- semBool. *) *)
+(*       by apply <- semBool. *)
+(*     + fold (semCheckable rejected). rewrite semResult. reflexivity. *)
+(* Qed. *)

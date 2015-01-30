@@ -1,4 +1,5 @@
-Require Import QuickChick SetOfOutcomes.
+Require Import QuickChick.
+Import Gen GenComb.
 
 Require Import List. Import ListNotations.
 Require Import ZArith.

@@ -3,7 +3,8 @@ Require Import ZArith.
 Require Import String.
 Require Import NPeano.
 
-Require Import QuickChick Gen.
+Require Import QuickChick.
+Import Gen GenComb.
 
 Require Export Utils.
 Require Export Labels.
@@ -24,20 +25,17 @@ Export MachineLab4M.
 Module IndistLab4M := IndistM Lab4M.
 Export IndistLab4M.
 
-Section GenUtils.
-  Context {Gen : Type -> Type}
-          `{GenMonad Gen}.
 
-Definition pure {A : Type} (x : A) : Gen A := returnGen x.
 
-Fixpoint foldGen {A B : Type} (f : A -> B -> Gen A) (l : list B) (a : A)
-: Gen A :=
+Definition pure {A : Type} (x : A) : G A := returnGen x.
+
+Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
+: G A :=
   match l with
     | [] => returnGen a
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end.
 
-End GenUtils.
 
 (* Variation stuff - should be deleted -- CH: ha? it seems used *)
 Inductive Variation {A : Type} :=

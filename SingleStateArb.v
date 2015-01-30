@@ -1,4 +1,5 @@
 Require Import QuickChick.
+Import Gen GenComb.
 
 Require Import Machine.
 
@@ -15,7 +16,7 @@ Require Import Printing.
    create (inefficient) instances for a single machine *)
 
 (* Generates an SSNI-oriented single machine state *)
-Definition genState {Gen : Type -> Type} `{GenMonad Gen} : Gen State :=
+Definition genState : G State :=
   bindGen gen_variation_state (fun v =>
   let '(Var _ st _) := v in
   returnGen st).

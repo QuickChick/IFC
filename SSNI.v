@@ -3,6 +3,7 @@ Require Import Arith.EqNat.
 Require Import ZArith.
 
 Require Import QuickChick.
+Import Gen GenComb.
 
 Require Import TestingCommon.
 Require Import Printing.
@@ -15,17 +16,9 @@ Require Import Show.
 
 Require Import Reachability.
 
+Definition is_low_state st lab := isLow (pc_lab (st_pc st)) lab.
 
-Section Checkers.
-  Context {Gen : Type -> Type}
-          {H : GenMonad Gen}.
-
-
-  Definition is_low_state st lab := isLow (pc_lab (st_pc st)) lab.
-
-Set Printing All.
-
-  Definition propSSNI_helper (t : table) (v : Variation) : Checker Gen :=
+Definition propSSNI_helper (t : table) (v : Variation) : Checker  :=
     let '(Var lab st1 st2) := v in
     (*  Checker.trace (Show.show lab ++ Show.nl ++
      showStatePair lab frameMap1 frameMap2 st1 st2) *)
@@ -36,7 +29,7 @@ Set Printing All.
             (if indist lab st1 st2 then
                (* XXX Our generator should always give us this by design.
                   If that's not the case the generator is broken. *)
-               match fstep t st1 return Gen QProp with
+               match fstep t st1  with
                  | Some st1' =>
                    if is_low_state st1 lab then
                      match fstep t st2 with
@@ -49,7 +42,7 @@ Set Printing All.
 *)
                                      (indist lab st1' st2')(*:Gen QProp*))
                        | _ => (* 1 took a low step and 2 failed *)
-                         collect "Second failed" (checker true : Gen QProp)
+                         collect "Second failed" (checker true)
                      (*
                 ((Checker.trace (show_pair lab st1 st1'))
                 (checker false))
@@ -69,10 +62,10 @@ Set Printing All.
 *)
                                                  (indist lab st1' st2') (* : Gen QProp *)
                                      )
-                           else collect "Second not low" (checker true : Gen QProp)
+                           else collect "Second not low" (checker true)
                          (* This can happen; it's just a discard *)
                          (* TODO: could check that st2' `indist` st1 *)
-                         | _ => collect "Second failed H" (checker true : Gen QProp)
+                         | _ => collect "Second failed H" (checker true)
                        (* This can happen; it's just a discard *)
                        end
                      else
@@ -83,18 +76,16 @@ Set Printing All.
 *)
                                        (indist lab st1 st1')
                                (*: Gen QProp*))
-                 | _ => collect "Failed" (checker true : Gen QProp)
+                 | _ => collect "Failed" (checker true)
                (* This can happen; it's just a discard *)
                (* TODO: could check if st2 does a H -> H step *)
                end
-             else collect "Not indist!" (checker true : Gen QProp)).
+             else collect "Not indist!" (checker true)).
            (* XXX this should never happen with a correct generator;
               and prop_generate_indist already tests this;
               so this should either go away or become (propery false) *)
 
-  Definition propSSNI t : Checker Gen :=
+  Definition propSSNI t : Checker :=
     forAllShrinkShow gen_variation_state (fun _ => nil) (fun _ => ""%string)
       (* shrinkVState *)
-      (propSSNI_helper t : @Variation State -> Gen QProp).
-
-End Checkers.
+      (propSSNI_helper t).
