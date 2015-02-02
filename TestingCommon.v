@@ -4,7 +4,7 @@ Require Import String.
 Require Import NPeano.
 
 Require Import QuickChick.
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 Require Export Utils.
 Require Export Labels.

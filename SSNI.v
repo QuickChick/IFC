@@ -3,7 +3,7 @@ Require Import Arith.EqNat.
 Require Import ZArith.
 
 Require Import QuickChick.
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 Require Import TestingCommon.
 Require Import Printing.

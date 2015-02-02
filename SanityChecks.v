@@ -1,5 +1,5 @@
 Require Import QuickChick.
-Import Gen GenComb.
+Import GenLow GenHigh.
 
 Require Import Reachability.
 Require Import Printing.
