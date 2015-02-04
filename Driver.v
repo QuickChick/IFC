@@ -19,26 +19,17 @@ Require Import SanityChecks.
 
 (* Testing well-formedness first *)
 
-(* TODO: CH: get rid of all this boilerplate code *)
-Definition test_stamp_generation :=
-  showResult (quickCheck prop_stamp_generation).
-QuickCheck test_stamp_generation.
+QuickCheck prop_stamp_generation.
 
-Definition test_generate_indist :=
-  showResult (quickCheck prop_generate_indist).
-QuickCheck test_generate_indist.
+QuickCheck prop_generate_indist.
 
-Definition test_fstep_preserves_well_formed :=
-  showResult (quickCheck (prop_fstep_preserves_well_formed default_table)).
-QuickCheck test_fstep_preserves_well_formed.
+QuickCheck (prop_fstep_preserves_well_formed default_table).
 
 (* Testing non-interference second (default table) *)
 
 Definition testSSNI t := quickCheck (propSSNI t).
 
-Definition testSSNIdefaultTable := showResult (testSSNI default_table).
-
-QuickCheck testSSNIdefaultTable.
+QuickCheck (propSSNI default_table).
 
 (* Testing mutants third *)
 
