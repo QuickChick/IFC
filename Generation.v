@@ -88,13 +88,24 @@ Instance smart_gen_pointer : SmartGen Pointer :=
     smart_gen := gen_pointer
   |}.
 
+(* Ints *) 
+Definition gen_int (inf : Info) : G Z :=
+  frequency (pure Z0)
+            [(10, arbitrary);
+              (1 , pure Z0);
+              (10, gen_from_length (code_len inf))].
+
+Instance smart_gen_int : SmartGen Z :=
+  {|
+    smart_gen := gen_int
+  |}.
+
 (* Values *)
 
 Definition gen_value (inf : Info) : G Value :=
   let '(MkInfo def cl dfs _) := inf in
     frequency (liftGen Vint arbitrary)
-              [(1, liftGen Vint  (frequency (pure Z0)
-                                    [(10,arbitrary); (1,pure Z0); (10, gen_from_length cl)]));
+              [(1, liftGen Vint  (smart_gen inf));
                       (* prefering 0 over other integers (because of BNZ);
                          prefering valid code pointers over invalid ones *)
                (1, liftGen Vptr  (smart_gen inf));
@@ -307,7 +318,8 @@ Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom) : G Atom :=
     frequency (returnGen a) 
       [(1, bindGen (gen_value inf) (fun v => returnGen (v @ l)))
       ;(9, match v with 
-             | Vint  _ => liftGen2 Atm (liftGen Vint  arbitrary) (pure l) 
+             | Vint  _ => 
+               liftGen2 Atm (liftGen Vint (smart_gen inf)) (pure l) 
              | Vptr  p =>  
                liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l) 
              | Vlab  _ => 
