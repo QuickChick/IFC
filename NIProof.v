@@ -672,14 +672,50 @@ Lemma indist_pc obs st1 st2 :
   isLow ∂(st_pc st1) obs ->
   st_pc st1 = st_pc st2.
 Proof.
-admit.
+intros H H0.
+simpl in H.
+apply Bool.andb_true_iff in H.
+inversion H as [_ H1]; subst; clear H.
+apply Bool.andb_true_iff in H1.
+inversion H1 as [_ H2]; subst; clear H1.
+apply Bool.andb_true_iff in H2.
+inversion H2 as [_ Hyp]; subst; clear H2.
+move:Hyp.
+move/implyP.
+move => Hyp.
+assert (isLow ∂(st_pc st1) obs || isLow ∂(st_pc st2) obs).
+  apply/orP.
+  left.
+  by [].
+apply Hyp in H.
+apply Bool.andb_true_iff in H.
+inversion_clear H.
+move:H1.
+move/eqP.
+by [].
 Qed.
 
 Lemma pc_eqS pc pc' l1 l2 :
   (PAtm (BinInt.Z.add pc 1) l1 == PAtm (BinInt.Z.add pc' 1) l2) =
   (PAtm pc l1 == PAtm pc' l2).
 Proof.
-admit.
+SearchAbout BinInt.Z.add.
+destruct (PAtm pc l1 == PAtm pc' l2) eqn:Eq.
++ move : Eq.
+  move/eqP.
+  move => Eq.
+  inversion Eq.
+  subst.
+  apply/eqP.
+  by [].
++ admit.
+(*  destruct (pc == pc') eqn:PCeq;
+  destruct (l1 == l2)  eqn:Leq;
+  move:PCeq; move/eqP => PCeq; subst;
+  move:Leq; move/eqP => Leq; subst.                         
+  - move:Eq. move/eqP => Eq. unfold not in Eq. 
+    exfalso. apply Eq. auto.
+  *)
 Qed.
 
 Lemma indist_mlab obs st1 st2 fp :

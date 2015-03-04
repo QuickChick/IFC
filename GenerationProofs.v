@@ -4,22 +4,27 @@ Require Import EquivDec.
 
 Require Import QuickChick.
  
-Require Import Common Indist Generation.
-Require Import SetOfOutcomes GenerationProofsHelpers.
+Require Import TestingCommon Indist Generation.
+Require Import Sets GenerationProofsHelpers.
 
 Require Import ssreflect ssrbool ssrnat eqtype.
 
+Section Sized.
+
+Variable size : nat.
+
 Lemma gen_from_length_correct: forall l,
-  (gen_from_length l) <--> (fun z => (Z.le 0 z /\ Z.le z (l-1))).
+  semGenSize (gen_from_length l) size <--> 
+  (fun z => (Z.le 0 z /\ Z.le z (l-1))).
 Proof.
-  move => l z. rewrite /gen_from_length choose_def.
+  move => l. rewrite /gen_from_length semChooseSize.
   split => [[/= H1 H2 ]| [H1 H2]].  
   split; by apply Zle_bool_imp_le.
   split; by apply Zle_imp_le_bool.
 Qed.
 
 Lemma gen_from_nat_length_correct: forall l,
-  (gen_from_nat_length l) <--> 
+  semGenSize (gen_from_nat_length l) size <--> 
   (fun z => (Z.le 0 z /\ Z.le z ((Z.of_nat l)-1))).
 Proof.
   move => l z.
@@ -28,19 +33,19 @@ Proof.
 Qed.
 
 Lemma gen_BinOpT_correct :
-  gen_BinOpT <--> all.
+  semGenSize gen_BinOpT size <--> [set: BinOpT].
 Proof.
   rewrite /gen_BinOpT /all. move => op.
   split => // _.
-  apply oneof_equiv. left.
-  case : op; [exists (pure BAdd) | exists (pure BMult)]; split => //=;
-  [|right]; by left.
+  apply semElementsSize.
+  case : op; simpl; auto.
+  - do 4 right; left; by []. (* I don't know why it doesn't get this *)
 Qed.
  
-Lemma gen_label_correct : gen_label <--> all.
+Lemma gen_label_correct : semGenSize gen_label size <--> [set: Label].
 Proof.
   rewrite /gen_label /all => l. split => [|?] //=.
-  apply elements_equiv. case l; simpl; by tauto.
+  apply semElementsSize. case l; simpl; by tauto.
 Qed.
 
 Section WithDataLenNonEmpty.
@@ -50,201 +55,291 @@ Hypothesis data_len_nonempty : data_len inf <> [].
 
 (* PC *)
 
-Definition PC_spec (pc : Ptr_atom) :=
+Definition pc_in_bounds (pc : Ptr_atom) :=
   let '(PAtm z l) := pc in
   (0 <= z <= (code_len inf) - 1)%Z.
 
 Lemma gen_PC_correct:
-  (gen_PC inf) <--> PC_spec.
+  semGenSize (gen_PC inf) size <--> [set pc : Ptr_atom | pc_in_bounds pc].
 Proof.
-  move=> ptr. rewrite /gen_PC /smart_gen /smart_gen_label.
+  rewrite /gen_PC /smart_gen /smart_gen_label /pc_in_bounds
+          semBindSize (eq_bigcupl _ gen_label_correct) => pc.
   split.
-  + rewrite bindGen_def. move => [lab [gen_lab H]].
-    rewrite bindGen_def in H.
-    move : H => [z [/gen_from_length_correct H1 Hret]].
-    rewrite returnGen_def in Hret. by subst.
-  + case : ptr => z l. move => [Hin Hrng].
-    rewrite bindGen_def. exists l; split.
-    by apply /gen_label_correct.
-    rewrite bindGen_def. exists z; split => //.
-    by apply /gen_from_length_correct.
+  + move => [label [_ /semBindSize[z [/gen_from_length_correct ?
+                                      /semReturnSize H2]]]].
+    by case H2.
+  + move: pc => [z l] EqZ.
+    exists l; split => //.
+    apply semBindSize.
+    rewrite /bigcup.
+    exists z; split.
+    * by apply gen_from_length_correct.
+    * by apply semReturnSize.
 Qed.
 
 
 (* Pointer *)
-Definition pointer_spec (ptr : Pointer) :=
+Definition valid_pointer (ptr : Pointer) :=
   let '(Ptr mf addr) := ptr in
   (exists len, In (mf, len) (data_len inf) /\
                (0 <= addr <= len - 1)%Z).
 
 Lemma gen_pointer_correct:
-    (gen_pointer inf) <--> pointer_spec.
+    semGenSize (gen_pointer inf) size <--> valid_pointer.
 Proof.
   move => ptr. remember inf as Inf.
   destruct Inf.
-  rewrite /gen_pointer.
+  rewrite /gen_pointer /valid_pointer.
   split.
-  * rewrite bindGen_def. move => [[mf z] [/elements_equiv Helem  H]].
-    rewrite bindGen_def in H. move : H => [a [/gen_from_length_correct H Hret]].
-    rewrite returnGen_def in Hret. subst ptr.
-    simpl. case : Helem => [HIn | [Heq1 [Heq2 Heq3]]].
-    - exists z. split => //. rewrite -HeqInf. assumption.
-    - by subst.
+  * move => /semBindSize[[mf z] [/semElementsSize H]].
+    destruct data_len.
+    - by case data_len_nonempty.
+    - move => /semBindSize [addr [/gen_from_length_correct ?]].
+      move => /semReturnSize Ret.
+      case Ret.
+      exists z; split;
+      by [case H => ?; subst; by [left | right] | ].
   * case: ptr => mf z.
-    destruct data_len as [| x xs].
-    - rewrite bindGen_def.
-      move=> [len  [//= HIn Hrng]].
-    -  Opaque bindGen choose Z.compare returnGen.
-       move=> [len  [//= HIn [Hrng1 Hrng2]]].
-       rewrite bindGen_def.
-       exists (mf, len). split.
-       apply/elements_equiv.
-       by left; rewrite -HeqInf in HIn.
-       rewrite bindGen_def.
-       exists z. split => //. split;
-       by apply Zle_imp_le_bool.
+    destruct data_len as [|x xs] eqn:DL.
+    - by case data_len_nonempty.
+    - move => [len [HIn EqZ]].
+      apply semBindSize.
+      exists (mf, len); split.
+      + apply semElementsSize.
+        subst; simpl in HIn.
+        case HIn => ?; by [left | right].
+      + apply semBindSize.
+        exists z; split.
+        * by apply gen_from_length_correct.
+        * by apply semReturnSize.
 Qed.
 
 (* Value *)
 
-Definition val_spec (inf : Info) (v : Value) : Prop :=
+Definition val_spec (v : Value) : Prop :=
   match v with
-    | Vint _ => True
-    | Vptr ptr =>
-      let '(Ptr mf addr) := ptr in 
-      (exists len, In (mf, len) (data_len inf) /\
-                   (0 <= addr <= len - 1)%Z)
+    | Vint n => (- Z.of_nat size <= n <= Z.max (Z.of_nat size) (code_len inf - 1))%Z 
+    | Vptr ptr => valid_pointer ptr
     | Vlab l => True
   end.
 
 Lemma gen_value_correct:
-    (gen_value inf) <--> (val_spec inf).
+    semGenSize (gen_value inf) size <--> val_spec.
 Proof. 
   rewrite /gen_value /val_spec.
-  clear data_len_nonempty. remember inf as Inf.
+  remember inf as Inf.
+  clear data_len_nonempty.
   case : Inf HeqInf => def clen dlen reg HeqInf.
-  case; rewrite !HeqInf.
+
+  case; rewrite HeqInf.
   + (* VInt *)
-    move => z. split => // _. apply/frequency_equiv.
-    left. exists 1. eexists. split. by constructor.
+    move => z. 
     split => //.
-    rewrite liftGen_def. eexists; split => //.
-    apply/frequency_equiv. left.
-    exists 10. exists arbitrary. split. by constructor.
-    split => //. by apply/arbInt_correct.
+    - move => /semFrequencySize /=.
+      move => [[freq g] [H1 /= H2]].
+      case: H1 => Hyp /=.
+      * case: Hyp => [? ?]; subst.
+        apply semLiftGenSize in H2.
+        case H2 => [z' [H3 H4]].
+        inversion H4; subst; clear H2 H4.
+        move: H3 => /semFrequencySize /=.
+        move => [[freq g] [H1 H2]].
+        case H1 => {H1}.
+        + (* 10, arbitraryZ *)
+          move => [] *; subst; apply arbInt_correct in H2.
+          split.
+          - omega.
+          - move: H2 => [? ?]. 
+            eapply Z.le_trans; eauto.
+            apply Z.le_max_l.
+        + (* 1, return 0 || 10 gen_from_length *)
+          move => H1; case H1 => {H1}.
+          - move => [] * /=; subst. 
+            simpl in H2. unfold pure in H2.
+            apply semReturnSize in H2.
+            case H2.
+            split; try omega.
+            eapply (Z.le_trans _ (Z.of_nat size) _); try omega.
+            by apply Z.le_max_l.
+          - move => H; case: H. move => [] *; subst.
+            simpl in H2. apply gen_from_length_correct in H2.
+            split; try omega.
+            eapply (Z.le_trans _ (clen - 1) _); try omega.
+            apply Z.le_max_r.
+        + by [].
+      * case: Hyp => //.
+        move => [] *; subst.
+        simpl in H2.
+        apply semLiftGenSize in H2.
+        by move: H2 => [? [_ ?]].
+      * move => H; case: H => //.
+        move => [] *; subst.                              
+        apply semLiftGenSize in H2.
+        by move: H2 => [x [_ H]].
+    - move => ZEq.
+      apply semFrequencySize => /=.
+      eexists. split; [by constructor | ] => /=.
+      apply semLiftGenSize.
+      exists z; split => //.
+      apply semFrequencySize => /=.
+      move: ZEq => [H1 H2].
+      case (Z_lt_le_dec z 0).
+      * move => [ZLt0].
+        eexists; split.
+        + by left.
+        + simpl; apply arbInt_correct; omega.
+      * move => ZGt0.
+        case (Z.max_spec (Z.of_nat size) (clen - 1)).
+        - move => [_ H]; subst; simpl in *.
+          rewrite H in H2.
+          eexists; split.
+          + by [right; right; left].
+          + simpl; apply gen_from_length_correct; omega.
+       - move => [_ H]; subst; simpl in *.
+         rewrite H in H2.
+         eexists; split.
+         + by left.
+         + simpl; apply arbInt_correct; omega.
   + (* Vptr *)
+    Opaque gen_pointer valid_pointer.
     case => mf addr.
-    split. Opaque bindGen choose Z.compare returnGen gen_pointer.
-    - move/frequency_equiv => [[n [ g [H1 [H2 H3]]]] | [[// | H1] H2]].
-      * case:H1 => [[Heq1 Heq2] | [[Heq1 Heq2] |
-                                   [[Heq1 Heq2] | [[Heq1 Heq2] | //]]]];
-        subst n g; try (subst Heq1 Heq2);
-        try (rewrite liftGen_def in H2; move : H2 => [a [H2 H2']]);
-        try discriminate.
-        move/gen_pointer_correct: H2 H2' => H2 [H2']; subst.
-        move : H2 => //= [len [ HIn Hrng]]. exists len. split => //.
-        by rewrite -HeqInf in HIn.
-      * by rewrite liftGen_def in H2; move : H2 => [a [H2 H2']].
-    - move => [len [HIn [Hrng1 Hrg2]]].
-      apply/frequency_equiv. left. exists 1. eexists.
-      split => //. apply in_cons.  constructor.
-      reflexivity. 
-      split => //. rewrite liftGen_def. eexists; split; [| reflexivity].
-      rewrite /smart_gen /smart_gen_pointer. apply gen_pointer_correct.
-      exists len. split => //.
+    split.
+    - move => /semFrequencySize /=.
+      move => [[freq g] [H1 /= H2]].
+      case: H1.
+      * move => [_ HG]; rewrite <- HG in H2; clear HG.
+        apply semLiftGenSize in H2.
+        by move: H2 => [x [_ H]].
+      * case.
+        + move => [_ HG] *.
+          rewrite <- HG in H2; clear HG.
+          apply semLiftGenSize in H2.
+          move: H2 => [ptr [H HIn]].
+          apply gen_pointer_correct in H.
+          inversion HIn.
+          rewrite <- H1.
+          auto.
+        + case => //.
+          clear HeqInf.
+          move => []*; subst.
+          apply semLiftGenSize in H2.
+          by move: H2 => [? [_ ?]].
+    - move => Valid.
+      apply semFrequencySize => /=.
+      eexists; split.
+      * by [right; left].
+      * simpl. apply semLiftGenSize. 
+        eexists; split.
+        + eapply gen_pointer_correct; eassumption.
+        + by [].
    + (* Vlab *)
-     move => L. split.
-     - move/frequency_equiv => [[n [g [H1 [H2 H3]]]] | [H1 H2]] //=.
-     - move => H. apply/frequency_equiv. left. exists 1. eexists.
-       split. apply in_cons. apply in_cons. constructor. 
-       reflexivity.
-       rewrite liftGen_def. split => //. exists L. split => //=.
-       by apply/gen_label_correct.
+     move => L. split => // _.
+     apply semFrequencySize => /=.
+     eexists; split.     
+     * by [right; right; left].
+     * simpl. apply semLiftGenSize.
+       eexists; split => //.
+       by apply gen_label_correct.
 Qed.
+(* We need more reasoning automation for frequencies... *)
 
 (* Atom *)
 
-Definition atom_spec inf atm  :=
+Definition atom_spec atm  :=
   let '(Atm val lab) := atm in
-  val_spec inf val.
+  val_spec val.
 
 Lemma gen_atom_correct:
-    (gen_atom inf) <--> (atom_spec inf).
+    semGenSize (gen_atom inf) size <--> atom_spec.
 Proof.
-  move => atm. rewrite /gen_atom /liftGen2 bindGen_def. case: atm => val lab.
+  move => [val lab]. rewrite /gen_atom. 
   split.
-  + move => [val' [/gen_value_correct Hval Hbind]].
-    rewrite bindGen_def in Hbind.
-    move : Hbind => [lab' [/gen_label_correct Hlab Hret]].
-    rewrite returnGen_def in Hret.
-    by move : Hret => [Heq1 Heq2]; subst.
-  + move => Hval.
-    exists val. split; [by apply/gen_value_correct| ].
-    rewrite bindGen_def. exists lab. split => //.
-    by apply/gen_label_correct.
-Qed.
+  + move => /semLiftGen2Size /=.
+    move => [[val' lab'] [H1 H2]].
+    inversion H2; subst; clear H2.
+    case: H1 => /= [H1 H2].
+    by apply gen_value_correct.
+  + move => H /=.
+    apply semLiftGen2Size.
+    eexists; split => /= ; try split => /=.
+    - eapply gen_value_correct.
+      rewrite /atom_spec in H.
+      by instantiate (1 := (val, lab)).
+    - by apply gen_label_correct.      
+    - by [].
+Qed.       
 
 (* regSet  *)
 
-Definition regs_spec inf regs :=
+Definition regs_spec regs :=
   (length regs = no_regs inf) /\
-  (forall reg, In reg regs -> atom_spec inf reg).
+  (forall reg, In reg regs -> atom_spec reg).
 
 Lemma gen_registers_correct:
-  (gen_registers inf) <--> (regs_spec inf).
+  semGenSize (gen_registers inf) size <--> regs_spec.
 Proof.
   move => regs.
   rewrite /gen_registers. split.
-  + move /vectorOf_equiv => [H1 H2].
+  + move /semVectorOfSize => [H1 H2].
     split => //. move => reg HIn. by apply/gen_atom_correct; apply H2.
-  + move => [Hlen Hregs]. apply/vectorOf_equiv. split => // x HIn.
+  + move => [Hlen Hregs]. apply/semVectorOfSize. split => // x HIn.
     apply/gen_atom_correct. by apply Hregs.
 Qed.
 
 (* stack_loc *)
 
-Definition stack_loc_spec (inf : Info)
+Definition valid_reg_ptr ptr_r := 
+  (Z0 <= ptr_r <= (Z.of_nat (no_regs inf) - 1))%Z.
+
+Definition stack_loc_spec 
 (g : Label -> Label -> Label -> Prop) (l1 l2: Label)
-(t : Ptr_atom * Label * list Atom * Z) : Prop :=
-  let '(ptr_a, lab, regs, ptr_r) := t in
-  regs_spec inf regs /\
-  (0 <= ptr_r <= (Z.of_nat (no_regs inf) - 1))%Z /\
+(t : StackFrame) : Prop :=
+  let '(SF ptr_a regs ptr_r lab) := t in
+  regs_spec regs /\
+  valid_reg_ptr ptr_r /\
   let 'PAtm addr lab' := ptr_a in
   (0 <= addr <= ((code_len inf) - 1))%Z /\
   g l1 l2 lab'.
 
 Lemma gen_stack_loc_correct :
-  forall f g l1 l2,
-    (f l1 l2) <--> (g l1 l2) ->
-    (smart_gen_stack_loc f l1 l2 inf) <--> (stack_loc_spec inf g l1 l2).
+  forall (f : Label -> Label -> G Label)
+         (g : Label -> Label -> (Label -> Prop)) l1 l2,
+    (semGenSize (f l1 l2) size <--> (g l1 l2)) ->
+    (semGenSize (smart_gen_stack_loc f l1 l2 inf) size <--> 
+                (stack_loc_spec g l1 l2)).
 Proof.
   move=> f g l1 l2 Hequiv.
-  rewrite /smart_gen_stack_loc /smart_gen /bindGen /returnGen
-          /PredMonad /bindP /returnP //=.
-  move => [[[ptr_a lab] regs] ptr_r]. split.
-  + move =>
-    [regs' [/gen_registers_correct Hregs
-             [ptr_a' [[lab' [/gen_label_correct Hlab H']]
-                      [z [[/Zle_bool_imp_le H1 /Zle_bool_imp_le H2] H]]]]]].
-    move: H => [a [/gen_label_correct Hlab' [lab'' [fl1l2 Hret]]]].
-    case: ptr_a' lab' Hret Hlab H' => addr_a' lab_a' lab' Hret' Hlab H'.
-    move : Hret' => [Heq1 Heq2 Heq3 Heq4]; subst.
-    rewrite  /bindGen /returnGen /PredMonad /bindP /returnP //= in H'.
-    move: H' => [z' [[/Zle_bool_imp_le H1' /Zle_bool_imp_le H2'] 
-                    [Heq1 Heq2]]]; subst.
-    repeat (split  => //=; by auto). repeat split => //=. 
-    by apply Hequiv.
-  + case: ptr_a. move => addr_a l_a [? [[? ?] [[? ?] ?]]].
-    eexists; split. by apply/gen_registers_correct.
-    eexists; split. exists lab. split.
-    by apply /gen_label_correct.
-    rewrite bindGen_def.
-    exists addr_a. split.
-    split; by apply/Zle_imp_le_bool.
-    rewrite returnGen_def. reflexivity.
-    exists ptr_r. split. split; by apply Zle_imp_le_bool.
-    exists lab. split. by apply /gen_label_correct.
-    exists l_a. split => //=. by apply Hequiv.
+  rewrite /smart_gen_stack_loc /smart_gen semBindSize.
+  split.
+  + move => [regs' [/gen_registers_correct Hregs]].
+    move /semBindSize => [[addr ?] []] Hpc.
+    move /semBindSize => [ptr_r []] Hptr_r.
+    move /semBindSize => [lab []] Hlab.
+    move /semBindSize => [pc_l []] Hpc_l.
+    move => /semReturnSize H.
+    inversion H; subst; clear H. (* LL: What should this be? *)
+    rewrite /stack_loc_spec.
+    do 3 split => //. 
+    - apply gen_from_nat_length_correct in Hptr_r.
+      by case Hptr_r.
+    - apply gen_from_nat_length_correct in Hptr_r.
+      by case Hptr_r.
+    - by apply gen_PC_correct in Hpc.
+    - by apply Hequiv.
+
+  + case: a => [[ret_pc_val ret_pc_lab] regs ptr_r lab] [[? ?] [H1 H2]]. 
+    eexists; split. by apply /gen_registers_correct.
+    apply semBindSize.
+    eexists; split => /=. apply /gen_PC_correct. by [].
+    rewrite /pc_in_bounds /=. by case H2.
+    apply semBindSize.
+    eexists; split. rewrite /valid_reg_ptr in H1. apply gen_from_nat_length_correct.
+    by apply H1.
+    apply semBindSize.     
+    exists lab; split. by apply gen_label_correct.
+    apply semBindSize.
+    eexists; split. apply Hequiv. case H2 => [_ H]; by apply H.
+    by apply semReturnSize.
 Qed.
 
 (* gen_label_between_lax *)
@@ -252,27 +347,21 @@ Qed.
 Definition gen_label_between_lax_spec (l1 l2 l: Label) : Prop :=
   l1 <: l /\ l <: l2 \/ l = l2 /\ ~ l1 <: l2.
 
+(* Simpler to destruct everything :) *)
 Lemma gen_label_between_lax_correct :
   forall l1 l2,
-    (gen_label_between_lax l1 l2) <--> gen_label_between_lax_spec l1 l2.
+    semGenSize (gen_label_between_lax l1 l2) size <--> gen_label_between_lax_spec l1 l2.
 Proof.
-  move => l1 l2 l.  rewrite /gen_label_between_lax. split. 
-  - move/elements_equiv => [ /filter_In [H1 H2] |
-                             [/filter_nil [/allThingsBelow_nonempty //| H1] H2]]. 
-    + apply allThingsBelow_isLow in H1.
-      rewrite /isLow in H2.  left; by split.
-    + right. split => //. specialize (H1 l2). rewrite /isLow in H1.
-      move=> contra. setoid_rewrite allThingsBelow_isLow in H1.
-      specialize (H1 (flows_refl _)). by rewrite H1 in contra.
-  - move => [[H1 H2] | [H1 H2]]; apply/elements_equiv.
-    + left. apply /filter_In. split => //.
-      by apply/allThingsBelow_isLow.
-    + right. split => //. apply filter_nil. subst. right. 
-      move => l' /allThingsBelow_isLow HIn. 
-      remember (isLow l1 l') as b. destruct b => //.
-      symmetry in Heqb. 
-      move: (flows_trans _ _ _ Heqb HIn) => contra. 
-      exfalso. auto.
+  move => l1 l2 l.  rewrite /gen_label_between_lax. 
+  split.
+  - move /semElementsSize => H.
+    destruct l1; destruct l2; destruct l; 
+    simpl in *; rewrite /gen_label_between_lax_spec => /= //;
+    try solve [left; auto]; try solve [right; auto]; try by case H => //; by case.
+  - rewrite /gen_label_between_lax_spec => H.
+    apply semElementsSize.
+    destruct l1; destruct l2; destruct l; simpl in *; case H; case;
+    try solve [left; auto]; try solve [right; auto]; by [].
 Qed.
 
 (* Stack *)

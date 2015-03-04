@@ -295,12 +295,25 @@ Class SmartVary (A : Type) := {
 (*         liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l) *)
 (*     end. *)
 
+(* LL: It might be the case that the values don't *have* to be of the same
+   constructor, but to get fewer discards it is worth it to keep instructions
+   "valid". I agree however that we need to *keep* the chance that something 
+   is changed. *)
+
 Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom) : G Atom :=
   let '(v @ l) := a in
   if flows l obs then returnGen a
   else
-    bindGen (gen_value inf) (fun v =>
-    returnGen (v @ l)).
+    frequency (returnGen a) 
+      [(1, bindGen (gen_value inf) (fun v => returnGen (v @ l)))
+      ;(9, match v with 
+             | Vint  _ => liftGen2 Atm (liftGen Vint  arbitrary) (pure l) 
+             | Vptr  p =>  
+               liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l) 
+             | Vlab  _ => 
+               liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l) 
+           end)
+       ].
 
 Instance smart_vary_atom : SmartVary Atom :=
 {|
