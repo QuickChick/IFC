@@ -75,6 +75,9 @@ Instance smart_gen_label : SmartGen Label :=
   smart_gen _info := gen_label
 |}.
 
+Definition gen_high_label (obs : Label) : G Label := 
+  elements H (filter (fun l => negb (isLow l obs)) (allThingsBelow H)).
+
 (* Pointers *)
 Definition gen_pointer (inf : Info) : G Pointer :=
     let '(MkInfo def _ dfs _) := inf in
@@ -333,17 +336,15 @@ Instance smart_vary_atom : SmartVary Atom :=
 |}.
 
 (* Vary a pc. If the pc is high, then it can vary - but stay high! *)
-(* LL: This doesn't result in uniform distribution of the higher pcs! *)
 
 Definition gen_vary_pc (obs: Label) (inf : Info) (pc : Ptr_atom)
 : G Ptr_atom :=
   let '(PAtm addr lpc) := pc in
   if isLow lpc obs then pure pc
   else
-    bindGen (smart_gen inf) (fun pc' =>
-    let '(PAtm addr' lpc') := pc' in
-    if (isHigh lpc' obs) then returnGen pc'
-    else returnGen (PAtm addr' (lpc' ∪ lpc))).
+    bindGen (gen_from_length (code_len inf)) (fun pcPtr =>
+    bindGen (gen_high_label obs) (fun pcLab => 
+    returnGen (PAtm pcPtr pcLab))).
 
 (* This generator fails to generate PCs with label higher that the observability
    level and lower than pc's label *)

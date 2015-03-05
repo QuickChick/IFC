@@ -29,13 +29,14 @@ Export IndistLab4M.
 
 Definition pure {A : Type} (x : A) : G A := returnGen x.
 
+(*
 Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
 : G A :=
   match l with
     | [] => returnGen a
     | (x :: xs) => bindGen (f a x) (foldGen f xs)
   end.
-
+*)
 
 (* Variation stuff - should be deleted -- CH: ha? it seems used *)
 Inductive Variation {A : Type} :=
