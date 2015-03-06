@@ -1156,43 +1156,17 @@ Proof.
             move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
             apply in_map_zip with (f := (@gen_vary_atom obs inf)) in HIn.
             move: (HIn) => HIn'. apply in_zip in HIn.
-            admit.
+            admit. (* Not sure how to use the new "Forall2" way to express the semantics *)
 (*            
             pose proof (Hforall (gen_vary_atom obs inf)).
             move/(_ ((v2 @ l2), gen_vary_atom obs inf (v1 @ l1)) HIn)
                : Hforall => /Hequiv /= [ Hindist Hspec].
             by repeat split => //. *)
           }
-          
-        
-        
-    move => Hgen. remember (@flows Lab4 _ stamp obs) as b. destruct b.
-    - (* stamp <: obs = true *) simpl in *.
-       remember (@flows Lab4 _ label obs) as b'.
-       destruct b'; symmetry in Heqb, Heqb'.
-       { (* label <: obs = true *)
-         move: (join_minimal stamp label obs Heqb Heqb')=> Hjoin.
-         rewrite Hjoin /= in Hgen.
-          move: Hgen => [data'' [/sequenceGen_equiv [Hlen Hforall]
-                                [eq1 eq2 eq3]]]; subst.
-          rewrite map_length in Hlen. rewrite Heqb.
-          have Hindist_spec:
-            (forall x y : Atom,
-               In (x, y) (seq.zip data data') ->
-               indist obs x y = true /\ atom_spec inf y).
-          { move => [v1 l1] [v2 l2] HIn. apply in_zip_swap in HIn.
-            move: (HIn) => HIn'. apply in_zip in HIn'. 
-            move: HIn' => [HIn1 Hval]. apply HforallIn in Hval.
-            move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
-            apply in_map_zip with (f := (@gen_vary_atom Pred _ obs inf)) in HIn.
-            move: (HIn) => HIn'. apply in_zip in HIn'.
-            move/(_ ((v2 @ l2), gen_vary_atom obs inf (v1 @ l1)) HIn)
-               : Hforall => /Hequiv /= [ Hindist Hspec].
-            by repeat split => //. 
-          }
           repeat (split => //; try apply/andP);
             try (try apply/leP; omega); try by apply flows_refl.
-          - apply forallb2_forall => //. split => //.
+          - rewrite /indist /indistList.
+            apply forallb2_forall => //. split => //.
             by move => x y /Hindist_spec [Hind _].
           - move => [v2 l2] HIn2.
             move : (HIn2) => HIn2'. apply in_split in HIn2'.
@@ -1217,68 +1191,119 @@ Proof.
               assumption.
             + rewrite Hlen. by apply leq_addr. }
         { (* label <: obs = false *)
-          apply Bool.negb_true_iff in Heqb'.
-          move/(join_equiv stamp label obs Heqb) : Heqb' => Hjoin.
-          rewrite /isHigh /isLow in Hjoin.  rewrite Hjoin in Hgen.
-          move : Hgen => [data'' [[len [Hchoose /vectorOf_equiv [Hlen Hforall]]]
-                                  [eq1 eq2 eq3]]]; subst.
-          rewrite choose_def in Hchoose.
-          move: Hchoose => [Hle3 Hle4].
-          simpl in Hle3, Hle4. rewrite Heqb.
+          apply Bool.negb_true_iff in Flows'.
+          move/(join_equiv stamp label obs Flows) : Flows' => Hjoin.
+          rewrite Hjoin.
+          move => /semBindSize [data'' [/semBindSize [len [/semChooseSize Hchoose
+                                                           /semVectorOfSize [Hlen Hforall]]] 
+                                         /semReturnSize [eq1 eq2 eq3]]]; subst.
+          assert (H : Random.leq (length data) (length data).+1).
+          { 
+            rewrite /Random.leq.
+            simpl.
+            apply/leP.
+            apply le_n_Sn.
+          } 
+          apply Hchoose in H; clear Hchoose; rename H into Hchoose.
+          move: Hchoose => /andP [Hle3 Hle4].
+          simpl in Hle3, Hle4. rewrite Flows.
           repeat (split => //; try apply/andP); (try by rewrite addn1); 
           try by apply flows_refl.
           by move => a /Hforall/gen_atom_correct Hin. }
     - (* stamp <: obs = false *)
-        simpl in *. remember (label <: obs) as b''.
-        move: Hgen => [lab [genLab [data'' [Hgen [eq1 eq2 eq3]]]]]; subst.
-        move: Hgen => [len [Hchoose /vectorOf_equiv [Hlen HforallIn']]]; subst.
-        rewrite choose_def in Hchoose.
-        move: Hchoose => [Hle3 Hle4]. simpl in *.
+        simpl in *. remember (label <: obs) as Flows''.
+        move => /semBindSize [lab [? /semBindSize [data'' 
+                                                     [/semBindSize [len [/semChooseSize H 
+                                                                         /semVectorOfSize 
+                                                                   [Hlen HforallIn']]]
+                                                      /semReturnSize [eq1 eq2 eq3]
+                             ]]]]; subst.
+          assert (Hchoose : Random.leq (length data) (length data).+1).
+          { 
+            rewrite /Random.leq.
+            simpl.
+            apply/leP.
+            apply le_n_Sn.
+          } 
+          apply H in Hchoose; clear H.
+          move: Hchoose => /andP [Hle3 Hle4]. simpl in *.
         repeat (split => //; try apply/andP); (try by rewrite addn1); 
           try by apply flows_refl.
         by move => a /HforallIn'; apply gen_atom_correct. }
-  { rewrite /indist /indistFrame /frame_spec /gen_var_frame /isHigh /isLow.
+  { rewrite /indist /indistFrame /frame_spec /gen_var_frame.
     remember (@flows Lab4 _ stamp obs) as b. destruct b; simpl in *;
     remember (@flows Lab4 _ stamp' obs) as b'; destruct b'; simpl in *;
     try (move: Hindist => /andP [Hl1 Hl2];
          move: (flows_antisymm _ _ Hl1 Hl2) => Heq; congruence).
-    - move=> [/andP [/andP [/andP [Hl1 Hl2] /andP [Hl3 Hl4]  H1] 
-                    [H2 /andP [Hrng1 Hrng2]]]].
-      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
-      move: (flows_antisymm _ _ Hl3 Hl4) => Heq {Hl3 Hl4}; subst.
+    - move=> [/andP [/eqP H1 H2] [H3 H4]].
+      subst.
+      symmetry in Heqb.
+      rewrite Bool.andb_if in H2.
+      rewrite Heqb in H2.
+      move : H2 => /andP [/eqP H1 H2]; subst.
+(*       move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
+      move: (flows_antisymm _ _ Hl3 Hl4) => Heq {Hl3 Hl4}; subst. *)
       remember (flows label' obs) as b''; destruct b''; simpl in *;
-      symmetry in Heqb, Heqb', Heqb''.
+      symmetry in Heqb''. 
       + (* label' <: obs = true *)
-        rewrite Heqb'' in H1.
-        move : H1 => /forallb2_forall [Hlen' HforallIn'].
+        { 
+        rewrite Heqb; simpl.
         rewrite (join_minimal _ _ _ Heqb Heqb'') /=.
-        exists data'. split => //. apply sequenceGen_equiv.
+        apply semBindSize.
+        exists data'. split => //. apply semSequenceGenSize.
+        rewrite /indist /indistList in H2.
+        move : H2 => /forallb2_forall [Hlen' HforallIn'].
         split => //.
-        * by rewrite map_length.
-        * move=> [[v' l'] gen] /in_map_zip_iff [[v l] [Heq   HIn]] /=; subst.
+        * by rewrite map_length. 
+        * admit. 
+          (* move=> [[v' l'] gen] /in_map_zip_iff [[v l] [Heq   HIn]] /=; subst.
           move: (HIn) => /in_zip_swap/HforallIn' HInzip.
           apply in_zip in HIn. move : HIn => [HIn1 /HforallIn Hval].
           apply (gen_vary_atom_correct obs (v @ l) Hval). split => //.
-          by move/H2 : HIn1=> ?.
-      + rewrite (not_flows_not_join_flows_right _ _ _ Heqb'') /=.
-        exists data'. split => //. exists (length data').
-        split.
-        * rewrite choose_def.
-          simpl => //. split => //=.  by rewrite -addn1.
-        * apply vectorOf_equiv. split => //.
-          by move => a /H2/gen_atom_correct HIn.
-    - move=> [/andP [Hl1 Hl2] _].
-      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. congruence.
-    - move=> [/andP [Hl1 Hl2] _].
-      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. congruence.
-    - move=> [/andP [Hl1 Hl2] [Hforall /andP [Hle1 Hle2]]].
-      move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst. 
+          by move/H2 : HIn1=> ?.*)
+        * by apply semReturnSize.
+        } 
+      + { 
+        rewrite (not_flows_not_join_flows_right _ _ _ Heqb'') /=.
+        rewrite Heqb; simpl.
+        apply semBindSize.
+        exists data'. split => //. 
+        apply semBindSize.
+        exists (length data'); split.
+        * apply semChooseSize. 
+          - rewrite /Random.leq.
+            simpl.
+            apply/leP.
+            apply le_n_Sn.
+          - move : H4 => /andP [Hle1 Hle2].
+            simpl => //. apply /andP. split => //=. 
+            by rewrite -addn1.
+        * apply semVectorOfSize. split => //.
+          move => a Hin.
+          apply /gen_atom_correct.
+          by apply H3.
+        * by apply semReturnSize.
+        }
+    - move=> [/andP [/eqP Hl1 Hl2] _].
+      symmetry in Heqb, Heqb'.
+      subst; congruence.
+    - move=> [/andP [/eqP Hl1 Hl2] _]; subst.
+      subst; congruence.
+    - move=> [/andP [/eqP Hl1 Hl2] [Hforall /andP [Hle1 Hle2]]]; subst.
+      symmetry in Heqb.
+      rewrite Heqb; simpl.
+      apply semBindSize.
       exists label'. split; [by apply gen_label_correct |].
-      exists data'. split => //.
-      + exists (length data'). split.
-        * rewrite choose_def. split => //. by rewrite -addn1. 
-        * apply vectorOf_equiv. split => //.
-          by move => a /Hforall/gen_atom_correct HIn. }
+      apply semBindSize.
+      exists data'. split => //=.
+      + apply semBindSize.
+        exists (length data'). split.
+        * apply semChooseSize. simpl. rewrite -addn1. admit. (*Should be easy! *)
+        * apply /andP. split => //. by rewrite -addn1.
+        * apply semVectorOfSize. split => //.
+          by move => a /Hforall/gen_atom_correct HIn. 
+          by apply semReturnSize.
+      }
 Qed.
 
 Lemma gen_vary_regSet_correct:
