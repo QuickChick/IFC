@@ -9,6 +9,43 @@ Require Import Sets GenerationProofsHelpers.
 
 Require Import ssreflect ssrbool ssrnat eqtype.
 
+(* The old version of the semantics for sequence is preferrable for these proofs *)
+Lemma Forall2_combine : forall {A} n (gs : list (G A)) l,
+  Forall2 (fun y => semGenSize y n) gs l ->
+  forall x, In x (seq.zip l gs) -> semGenSize (snd x) n (fst x).
+Proof. 
+  move => A size gs l H.
+  induction H as [| x y l l' H1 H2 Hforall ].
+  + move => x HIn.
+    inv HIn.
+  + move => [a ga] HIn.
+    simpl in *.
+    case: HIn => [[]* | HIn]; subst => //=.
+    by apply Hforall in HIn; simpl in HIn.
+Qed.    
+
+Lemma seqzip__Forall2 : forall {A} n (gs : list (G A)) l,
+  length l == length gs ->
+  (forall x, In x (seq.zip l gs) -> semGenSize (snd x) n (fst x)) ->
+  Forall2 (fun y => semGenSize y n) gs l.
+Proof. 
+  move => A size gs.
+  induction gs as [ | g gs IHg].
+  + move => l Hlen HIn.
+    destruct l.
+    - by constructor.
+    - inv Hlen.
+  + move => l Hlen HIn.
+    destruct l.
+    - inv Hlen.
+    - constructor => //.
+      * apply (HIn (a,g)). by left.
+      * apply IHg => //=.
+        move => x HIn'.
+        apply HIn.
+        by right.
+Qed.
+    
 Section Sized.
 
 Variable size : nat.
@@ -1156,12 +1193,11 @@ Proof.
             move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
             apply in_map_zip with (f := (@gen_vary_atom obs inf)) in HIn.
             move: (HIn) => HIn'. apply in_zip in HIn.
-            admit. (* Not sure how to use the new "Forall2" way to express the semantics *)
-(*            
-            pose proof (Hforall (gen_vary_atom obs inf)).
-            move/(_ ((v2 @ l2), gen_vary_atom obs inf (v1 @ l1)) HIn)
-               : Hforall => /Hequiv /= [ Hindist Hspec].
-            by repeat split => //. *)
+            apply (Forall2_combine _ _ _ Hforall _) in HIn'.
+            simpl in HIn'.
+            apply Hequiv in HIn'.
+            case : HIn' => [Hindist Hspec].
+            by split => //.
           }
           repeat (split => //; try apply/andP);
             try (try apply/leP; omega); try by apply flows_refl.
@@ -1255,12 +1291,18 @@ Proof.
         move : H2 => /forallb2_forall [Hlen' HforallIn'].
         split => //.
         * by rewrite map_length. 
-        * admit. 
-          (* move=> [[v' l'] gen] /in_map_zip_iff [[v l] [Heq   HIn]] /=; subst.
-          move: (HIn) => /in_zip_swap/HforallIn' HInzip.
-          apply in_zip in HIn. move : HIn => [HIn1 /HforallIn Hval].
-          apply (gen_vary_atom_correct obs (v @ l) Hval). split => //.
-          by move/H2 : HIn1=> ?.*)
+        * apply seqzip__Forall2.
+          - rewrite map_length. by rewrite Hlen'.
+          - move => [a ga] /in_map_zip_iff [[v l] [Heq HIn]].
+            simpl in *.
+            move: (HIn) => /in_zip_swap/HforallIn' HInzip.
+            apply in_zip in HIn. move : HIn => [HIn1 /HforallIn Hval].
+            subst.
+            apply (gen_vary_atom_correct obs (v @ l) Hval). 
+            destruct a eqn:A.
+            split => //.
+            apply H3 in HIn1.
+            by rewrite /atom_spec in HIn1.
         * by apply semReturnSize.
         } 
       + { 
@@ -1298,7 +1340,8 @@ Proof.
       exists data'. split => //=.
       + apply semBindSize.
         exists (length data'). split.
-        * apply semChooseSize. simpl. rewrite -addn1. admit. (*Should be easy! *)
+        * apply semChooseSize. simpl. 
+          admit. (* le_n_Sn for coq_nat..?*)
         * apply /andP. split => //. by rewrite -addn1.
         * apply semVectorOfSize. split => //.
           by move => a /Hforall/gen_atom_correct HIn. 
@@ -1308,16 +1351,16 @@ Qed.
 
 Lemma gen_vary_regSet_correct:
   forall regs obs,
-    (regs_spec inf regs)->
-    (sequenceGen (map (@smart_vary _ _ (smart_vary_atom) obs inf) regs)) <-->
+    (regs_spec regs)->
+    semGenSize (sequenceGen (map (@smart_vary _ (smart_vary_atom) obs inf) regs)) size <-->
     (fun regs' =>
-       regs_spec inf regs' /\ indist obs regs regs').
+       regs_spec regs' /\ indist obs regs regs').
 Proof.
   Opaque gen_vary_atom.
   move => regs obs [Hlen Hspec] regs'. split.
   - (* Correctness *)
-    move/sequenceGen_equiv=> [Hlen' HIn].
-    rewrite /indist /indistReg.
+    move => /semSequenceGenSize [Hlen' HIn].
+    rewrite /indist /indistList.
     split.
     + (* regs_spec *)
       rewrite /regs_spec. split.
@@ -1348,8 +1391,8 @@ Proof.
             by apply/orP; right.
             rewrite map_length -!size_length in Hlen'.
             by rewrite -seq.size_cat -Hlen' Heq. }
-          have /HIn Hind: In (vr' @ lr', (@smart_vary Pred _ smart_vary_atom obs inf) (vr @ lr))
-                 (seq.zip regs' (map (@smart_vary _ _ smart_vary_atom  obs inf) regs))
+          have Hind: In (vr' @ lr', (@smart_vary _ smart_vary_atom obs inf) (vr @ lr))
+                 (seq.zip regs' (map (@smart_vary  _ smart_vary_atom  obs inf) regs))
             by apply in_map_zip.
           simpl in Hind. apply in_zip in Hzip.
           move : Hzip => [HIn1 /Hspec Hval].
