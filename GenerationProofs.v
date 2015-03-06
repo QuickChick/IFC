@@ -13,6 +13,12 @@ Section Sized.
 
 Variable size : nat.
 
+Lemma existsHighObsLow : forall l obs,
+  isHigh l obs -> isHigh H obs.
+  move => l obs High.
+  destruct l; destruct obs; auto.
+Qed.
+
 Lemma gen_from_length_correct: forall l,
   (Random.leq 0 (l-1))%Z ->
   semGenSize (gen_from_length l) size <--> 
@@ -1073,7 +1079,7 @@ Lemma gen_vary_pc_correct:
   forall (obs: Label) (pc : Ptr_atom),
     (pc_in_bounds pc) ->
     semGenSize (gen_vary_pc obs inf pc) size <--> 
-    (fun pc' => (if isLow ∂pc obs then pc == pc' else True) /\ pc_in_bounds pc').
+    (fun pc' => (if isLow ∂pc obs then pc == pc' else isHigh ∂pc' obs) /\ pc_in_bounds pc').
 Proof.
   move => obs [pc_a pc_l] Hspec pc'.
   rewrite /gen_vary_pc /pc_lab.
@@ -1087,79 +1093,37 @@ Proof.
       apply semReturnSize.
       by move: H1 => /eqP ->.
   - split.     
-    + rewrite /smart_gen.
-      move => /semBindSize [[xa xl] [H1 H2]].
+    + move => /semBindSize [xa [/gen_from_length_correct H1 H2]].
+      move: H2 => /semBindSize [xl [/gen_high_label_correct H3 /semReturnSize H4]].
+      apply H1 in code_len_correct; clear H1; rename code_len_correct into H1.
+      rewrite /negb in HeqFlows.
+      assert (isHigh pc_l obs) by by (rewrite /negb; rewrite <- HeqFlows).
+      apply existsHighObsLow in H.
+      apply H3 in H.
+      inv H4.
       split => //=.
-      remember (flows xl obs) as Flows'.
-      destruct Flows'; 
-      rewrite /negb in H2;
-      apply semReturnSize in H2;
-      inv H2;
-      apply gen_PC_correct in H1;
-      by unfold pc_in_bounds in *.
-    + move => [_ H].
+    + move => [H1 H2].
       apply semBindSize.
-      eexists; split.
-      * rewrite /smart_gen. apply gen_PC_correct. by apply H.
-      * destruct pc' eqn:PC.
-        destruct (~~ isLow l obs) eqn:Flows'.
+      destruct pc' as [xa xl] eqn:PC.
+      exists xa; split.
+      * by apply gen_from_length_correct.
+      * apply semBindSize.
+        exists xl; split => //=.
+        - apply gen_high_label_correct => //.
+          by apply (existsHighObsLow xl).
         - by apply semReturnSize.
-        - apply semReturnSize
-        
-      rewrite /eq_op in H1. simpl in H1. 
-      destruct pc' eqn:PC.
-      move: H1 => /andP [H0 H1].
-      
-
-  rewrite /gen_vary_pc /indist /indistPtrAtm /isHigh /isLow /pure.
-  case: pc Hspec => z lpc; case: pc' => z' lpc' Hspec.
-  split.
-  + (* Correctness *) (* CH: very strange that we need to pass Lab4 explicitly *)
-    remember (@flows Lab4 _ lpc obs) as b;
-    remember (@flows Lab4 _ lpc' obs) as b'.
-    case: b Heqb; case: b' Heqb' => Heqb' Heqb.
-    - move => [Heq Heq']; subst. split => //=.
-      apply/andP. split. rewrite /label_eq.
-      by apply/andP; split; apply/flows_refl.
-      rewrite /Z_eq. by case: (Z.eq_dec z' z').
-    - move => [Heq Heq']; subst. congruence.
-    - rewrite bindGen_def. move => [pc'' [Hspec'' H]].
-      case: pc'' Hspec'' H => z'' lpc''.
-      rewrite returnGen_def. move=> Hspec''.
-      remember (@flows Lab4 _ lpc'' obs) as b''.
-      case : b'' Heqb'' => Heqb'' ; move => [Heq1 Heq2]; subst; symmetry in Heqb.
-      * apply not_flows_not_join_flows_right with (l1 := lpc'') in Heqb.
-        case obs; simpl in *; congruence.
-      * congruence.
-    - rewrite bindGen_def. move => [pc'' [Hspec'' H]].
-      case: pc'' Hspec'' H => z'' lpc'' /gen_PC_correct Hspec''.
-      remember (@flows Lab4 _ lpc'' obs) as b''.
-      case : b'' Heqb'' => Heqb''; move => [Heq1 Heq2]; subst;
-      symmetry in Heqb; split => //.
-  + (* Completeness *)
-    Opaque PC_spec. remember (@flows Lab4 _ lpc obs) as b;
-    remember (@flows Lab4 _ lpc' obs) as b'.
-    case: b Heqb; case: b' Heqb' => Heqb' Heqb [H1 H2] //.
-    + move : H1 => /andP [/andP [Hf Hf'] H1']. rewrite /Z_eq in H1'.
-      move: (flows_antisymm _ _ Hf Hf') => Heq; subst.
-      by case: ( Z.eq_dec z z') H1' => // Heq _; subst.
-    + rewrite /PC_spec in H2.
-      rewrite bindGen_def. exists (PAtm z' lpc').
-      split. by apply gen_PC_correct.
-      by  rewrite -Heqb'.
-Qed.
-
+Qed.          
 
 (* Vary Memory *)
 
 Definition frame_spec (fr : frame) :=
   let 'Fr _ _ data := fr in
-      (forall a, In a data -> atom_spec inf a).
+      (forall a, In a data -> atom_spec a).
 
 Lemma gen_vary_frame_correct :
   forall obs fr,
     (frame_spec fr) ->
-    (gen_var_frame obs inf fr) <-->
+    semGenSize (gen_var_frame obs inf fr) size <-->
     (fun fr' => indist obs fr fr' /\
      (frame_spec fr') /\
      let 'Fr _ _ data := fr in
@@ -1170,7 +1134,38 @@ Proof.
               [stamp' label' data'].
   Opaque indist join flows gen_vary_atom.
   split.
-  { rewrite /gen_var_frame /indist /indistFrame /isHigh /isLow.
+  { rewrite /gen_var_frame /indist /indistFrame.
+    destruct (isLow stamp obs) eqn:Flows.
+    - (* stamp <: obs *)
+      simpl in *.
+      destruct (isLow label obs) eqn:Flows'.
+      { (* label <: obs *)
+        simpl in *.
+        move: (join_minimal stamp label obs Flows Flows') => Hjoin.
+        rewrite Hjoin /=.
+        move => /semBindSize [data'' [/semSequenceGenSize [Hlen Hforall] 
+                                      /semReturnSize [eq1 eq2 eq3]]]; subst.
+        rewrite map_length in Hlen. rewrite Flows.
+        have Hindist_spec:
+          (forall x y : Atom,
+             In (x, y) (seq.zip data data') ->
+             indist obs x y = true /\ atom_spec y).
+          { move => [v1 l1] [v2 l2] HIn. apply in_zip_swap in HIn.
+            move: (HIn) => HIn'. apply in_zip in HIn'. 
+            move: HIn' => [HIn1 Hval]. apply HforallIn in Hval.
+            move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
+            apply in_map_zip with (f := (@gen_vary_atom obs inf)) in HIn.
+            move: (HIn) => HIn'. apply in_zip in HIn.
+            admit.
+(*            
+            pose proof (Hforall (gen_vary_atom obs inf)).
+            move/(_ ((v2 @ l2), gen_vary_atom obs inf (v1 @ l1)) HIn)
+               : Hforall => /Hequiv /= [ Hindist Hspec].
+            by repeat split => //. *)
+          }
+          
+        
+        
     move => Hgen. remember (@flows Lab4 _ stamp obs) as b. destruct b.
     - (* stamp <: obs = true *) simpl in *.
        remember (@flows Lab4 _ label obs) as b'.
