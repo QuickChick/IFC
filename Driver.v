@@ -40,7 +40,9 @@ Instance mutateable_table : Mutateable table :=
 {|
   mutate := mutate_table
 |}.
-
+(*
+Eval simpl in (nth 24 (mutate_table default_table) default_table).
+*)
 MutateCheckMany default_table (fun t => [propSSNI t;
     prop_fstep_preserves_well_formed t]).
 

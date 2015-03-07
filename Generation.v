@@ -446,44 +446,47 @@ Instance smart_vary_memory : SmartVary memory :=
 (*       bindGen (gen_from_nat_length (no_regs inf)) (fun r' => *)
 (*       returnGen (pc', lab', rs', r'))))). *)
 
+(*
+Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
+  let 'SF ret_addr  _ _ _ := sf in
+  let 'PAtm _ l_ret_addr := ret_addr in
+  flows l_ret_addr lab.
 
-Definition gen_vary_stack_loc (obs: Label) (inf : Info)
-           (s : StackFrame) : G (StackFrame) :=
-    let 'SF pc rs r lab := s in
-    (* If the return label is low just vary the registers (a bit) *)
-    if isLow ∂pc obs then
-      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>
-      returnGen (SF pc rs' r lab))
-    else
-    (* Return label is high, create new register file *)
-    (* ZP: Why not generate new pc, lab and r? *)
-      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>
-      returnGen (SF pc rs' r lab)).
+Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
+  (List.filter (stackFrameBelow lab) (unStack s)).
 
-(* Just vary a single stack location *)
-Instance smart_vary_stack_loc : SmartVary StackFrame :=
+Instance indistStack : Indist Stack :=
 {|
-  smart_vary := gen_vary_stack_loc
+  indist lab s1 s2 :=
+    indist lab (filterStack lab s1) (filterStack lab s2)
 |}.
+*)
+Definition gen_vary_stack_loc (obs: Label) (inf : Info)   
+           (s : StackFrame)   
+: G StackFrame :=
+    let '(SF pc rs r lab) := s in  
+    (* If the return label is low just vary the registers (a bit) *)
+    if isLow ∂pc obs then   
+      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>  
+      returnGen (SF pc rs' r lab ))  
+    else   
+      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>  
+      bindGen (smart_vary obs inf pc) (fun pc' =>  
+      bindGen (smart_gen inf) (fun lab' =>  
+      bindGen (gen_from_nat_length (no_regs inf)) (fun r' =>  
+      returnGen (SF pc' rs' r' lab'))))).  
 
-Definition gen_vary_stack (obs: Label) (inf : Info) (s: list StackFrame)
-  : G (list StackFrame) :=
-  let fix aux (s : list StackFrame) :=
-      match s with
-        | nil => pure nil
-        | sl :: s' =>
-          bindGen (smart_vary obs inf sl) (fun sl' =>
-            bindGen (aux s') (fun s'' =>
-            returnGen (sl' :: s'')))
-        end in
-    aux s.
+Definition gen_vary_low_stack (obs : Label) (inf : Info) (s : list StackFrame) 
+: G (list StackFrame) := 
+  sequenceGen (map (gen_vary_stack_loc obs inf) s).
 
+Definition gen_vary_stack (obs : Label) (inf : Info) (s : Stack) 
+: G Stack := 
+frequency (returnGen (ST [])) [(1, liftGen ST (gen_vary_low_stack obs inf (unStack s)))].
 
-(* In here I don't have information if the pc is high -
-   create extra "high" stack locations in vary state *)
 Instance smart_vary_stack : SmartVary Stack :=
 {|
-  smart_vary l i s := liftGen ST (gen_vary_stack l i (unStack s))
+  smart_vary := gen_vary_stack
 |}.
 
 Definition gen_vary_state (obs: Label) (inf : Info) (st: State) : G State :=
@@ -500,24 +503,7 @@ Definition gen_vary_state (obs: Label) (inf : Info) (st: State) : G State :=
       (* Memory varies the same way *)
       bindGen (smart_vary obs inf μ) (fun μ' =>
       (* Stack varies the same way at first *)
-      bindGen (smart_vary obs inf s) (fun s_imm =>
-      (* LL: Revisit this. Add arbitrary stack locations?
-         For now make sure it is high *)
-(* CH: this is broken (no H->L cases); and way too complicated
-      let low_limit := join_label obs (get_stack_label s_imm) in
-      let gen_l_fun := if isHigh low_limit obs then gen_label_between_lax
-                       else gen_label_between_strict in
-      bindGen (smart_gen_stack_loc gen_l_fun low_limit ∂pc inf) (fun sl =>
-(* This doesn't work better! *)
-
-(*       bindGen (smart_gen_stack_loc gen_label_between_strict obs ∂pc inf) (fun sl => *)
-
-      let s' := RetCons sl s_imm in
-*)
-
-(* CH: this expedient fix (probably still broken) already finds Mutant 9 *)
-      let s' := s_imm in
-
+      bindGen (smart_vary obs inf s) (fun s' =>
       (* Recreate registers *)
       bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun r' =>
       returnGen (St im μ' s' r' pc'))))).
