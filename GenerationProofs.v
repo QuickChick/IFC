@@ -771,30 +771,31 @@ Qed.
 
 (* Instruction *)
 
-(*
 Definition Instruction_spec (st : State) (instr : @Instr Label) :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [] [] [] [] Z0 in
   match instr with
+    | PcLab z | PutLab _ z 
     | Put _ z => (0 <= z <= (Zlength regs -1))%Z
-    | Move z1 z2 => (0 <= z1 <= (Zlength regs -1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
+    | Mov z1 z2 => (0 <= z1 <= (Zlength regs -1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
 
-    | MLab z1 z2 | Load z1 z2 | Store z1 z2 | MSize z1 z2 | PGetOff z1 z2 | PSetOff z1 z2 
+    | MLab z1 z2 | Load z1 z2 | Store z1 z2 | MSize z1 z2 | PGetOff z1 z2 
     | Write z1 z2 =>
       dptr <> [] /\ In z1 dptr /\  (0 <= z2 <= (Zlength regs-1))%Z
                                                   
     | Nop => True | Halt => False
-    | PcLab z | PutLab _ z 
     | Lab z1 z2 =>
       (0 <= z1 <= (Zlength regs-1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
  
-    | FlowsTo z1 z2 z3 | LJoin z1 z2 z3 =>
-      lab <> [] /\ In z1 lab /\ In z2 lab /\  (0 <= z3 <= (Zlength regs-1))%Z
     | BCall z1 z2 z3 =>
       cptr <> [] /\ lab <> [] /\
       In z1 cptr /\ In z2 lab /\  (0 <= z3 <= (Zlength regs-1))%Z
-    | BRet => (containsRet stk = true)
+    | BRet => 
+      match stk with 
+        | ST [] => False 
+        | ST _  => True 
+      end
     | Alloc z1 z2 z3 =>
       num <> [] /\ lab <> [] /\
       In z1 num /\ In z2 lab /\  (0 <= z3 <= (Zlength regs-1))%Z
@@ -803,10 +804,11 @@ Definition Instruction_spec (st : State) (instr : @Instr Label) :=
     | PSetOff z1 z2 z3 =>
       dptr <> [] /\ num <> [] /\
       In z1 dptr /\ In z2 num /\  (0 <= z3 <= (Zlength regs-1))%Z
-    | Output z1 =>
-      num <> [] /\ In z1 num
-    | BinOp _ z1 z2 z3 =>
+    | BinOp BAdd z1 z2 z3 | BinOp BMult z1 z2 z3 | BinOp BEq z1 z2 z3 =>
       num <> [] /\ In z1 num /\ In z2 num /\ (0 <= z3 <= (Zlength regs-1))%Z
+    | BinOp BJoin z1 z2 z3 | BinOp BFlowsTo z1 z2 z3 =>
+      lab <> [] /\ In z1 lab /\ In z2 lab /\ (0 <= z3 <= (Zlength regs-1))%Z
+
   end.
 
 Ltac discr_gen_eq :=
@@ -814,24 +816,24 @@ Ltac discr_gen_eq :=
     | H : (_, liftGen ?f ?gen) = (?n, ?g),
       Hg : ?g _ |- _ =>
         move : H => [Heq1 Heq2]; subst;
-        rewrite liftGen_def in Hg; move: Hg => [a [_ H]]; discriminate
+        apply semLiftGenSize in Hg; move: Hg => [a [_ H]]; discriminate
     | H : (_, returnGen ?a) = (?n, ?g),
       Hg : ?g _ |- _ =>
         move : H => [Heq1 Heq2]; subst; discriminate
     | H : (_, liftGen2 ?f ?gen1 ?gen2) = (?n, ?g),
       Hg : ?g _ |- _ =>
       move : H => [Heq1 Heq2]; subst;
-      rewrite liftGen2_def in Hg;
+      apply semLiftGen2Size in Hg;
       move: Hg => [a [_ [a' [_ H]]]]; subst; discriminate
     | H : (_, liftGen3 ?f ?gen1 ?gen2 ?gen3) = (?n, ?g),
       Hg : ?g _ |- _ =>
       move : H => [Heq1 Heq2]; subst;
-      rewrite liftGen3_def in Hg;
+      apply semLiftGen3Size in Hg;
       move: Hg => [a [_ [a' [_ [a'' [ _ H]]]]]]; subst; discriminate
     | H : (_, liftGen4 _ _ _ _ _) = (_, ?g),
       Hg : ?g _ |- _ =>
       move : H => [Heq1 Heq2]; subst;
-      rewrite liftGen4_def in Hg;
+      apply semLiftGen4Size in Hg;
       move: Hg => [a [_ [a' [_ [a'' [ _ [a''' [ _ H]]]]]]]]; subst; discriminate
 
   end.
@@ -842,7 +844,7 @@ Ltac discr_or_first :=
     | HIn : In (_, _) _ |- _ => case: HIn => [Heq | HIn]; [discr_gen_eq | ]
   end.
 
-
+(*
 Ltac unfold_gen :=
   match goal with
     | Hg : returnGen _ _ |- _ =>
@@ -944,15 +946,66 @@ Ltac try_solve2 :=
     | |- ~ (if ?b then _ else _) = 0 => by destruct b
     | _ => by []
   end. 
- 
+ *)
 
+Ltac solver :=
+  match goal with 
+    | Hl : _ (_,_) , Hsem : semGenSize _ _ _ |- _ => 
+  case : Hl => [[] * | Hl];
+       [ subst; simpl in Hsem;
+         match goal with 
+           | H : semGenSize (pure _) size _ |- _ => 
+             apply semReturnSize in Hsem; 
+               inv Hsem
+           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGenSize [? [x H]];
+             inv H
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
+             rewrite /prod_curry in H; [inv H]
+           | H : semGenSize (liftGen3 _ _ _ _) _ _ |- _ =>
+             move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]];
+             discriminate
+           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ => 
+             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+             discriminate
+           | _ => idtac
+         end | solver ]
+    | Hl : (_,_) = (_,_) \/ _ , Hsem : semGenSize _ _ _ |- _ => 
+      case : Hl => [[] * | Hl];
+       [ subst; simpl in Hsem;
+         match goal with 
+           | H : semGenSize (pure _) size _ |- _ => 
+             apply semReturnSize in Hsem; 
+               inv Hsem
+           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGenSize [? [x H]];
+             inv H
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
+             rewrite /prod_curry in H; [inv H]
+           | H : semGenSize (liftGen3 _ _ _ _) _ _ |- _ =>
+             move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]];
+             discriminate
+           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ => 
+             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+             discriminate
+           | _ => idtac
+         end | solver ]
+    | _ => idtac
+  end.
 
- 
+(*
 Lemma gen_ainstrSSNI_correct :
-  forall (st : State), (ainstrSSNI st) <--> (Instruction_spec st).
+  forall (st : State), 
+    (Random.leq Z0 (Zlength (st_regs st) -1))%Z ->
+    semGenSize (ainstrSSNI st) size <--> (Instruction_spec st).
 Proof.
-  move=> st instr. rewrite /ainstrSSNI /Instruction_spec.
-  case: st => im m stk regs pc.
+  move=> [im m stk regs pc] reg_no instr. rewrite /ainstrSSNI /Instruction_spec.
   set st := {|
              st_imem := im;
              st_mem := m;
@@ -961,11 +1014,88 @@ Proof.
              st_pc := pc |}.
   case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab].
   split.
-  - case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
+  - destruct instr; 
+    move =>  /semFrequencySize HSem;
+    rewrite /onNonEmpty in HSem.
+   
+    destruct dptr; destruct cptr; destruct num; destruct lab; destruct (unStack stk);
+    simpl in HSem;
+    move : HSem => [[freq g] [Hl Hsem]];
+    solver;
+    try solve [
+    move : H => [H1 H2]; by apply gen_from_length_correct];
+    try solve [inv Hl].
+
+    destruct dptr; destruct cptr; destruct num; destruct lab; destruct (unStack stk);
+    simpl in HSem;
+    move : HSem => [[freq g] [Hl Hsem]];
+    solver;
+    try solve [inv Hl];
+    repeat match goal with 
+             | |- (_ <= _ <= _)%Z /\ _ => split 
+             | H : setX _ _ _ |- _ => move : H => [H1 H2]
+           end; by apply gen_from_length_correct.
+      match goal with
+        | H : setX _ _ _ |- _ => move : H => [H1 H2]
+      end.
+
+      | H : False |- _ => inv H
+
+    try solve [
+    move : H => [H1 H2]; by apply gen_from_length_correct];
+
+             move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]]; 
+             discriminate.
+    move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+                  discriminate.
+
+    repeat (case : Hl => [[] * | Hl];
+       [ subst; simpl in Hsem; 
+         match goal with 
+           | H : semGenSize (pure _) size _ |- _ => 
+             apply semReturnSize in Hsem; 
+               inv Hsem
+           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGenSize [? [x H]];
+             inv H
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+             let x := fresh in
+             move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
+             rewrite /prod_curry in H; [inv H]
+           | _ => idtac
+         end | ]).
+    rewrite /Random.leq.
+    by 
+    apply gen_from_length_correct in H2.
+    
+    rewrite /prod_curry in Hsem.
+    inv Hsem.
+    
+    case : Hl => [[] * | Hl].
+    subst; simpl in Hsem.
+    match goal with 
+      | H : semGenSize (liftGen _ _) _ _ |- _ => 
+        move : Hsem => /semLiftGenSize [? [? ?]] //=
+    end.
+    
+
+    apply semReturnSize in Hsem.
+    match goal with
+      | HIn : (_ , _) \/ _) = (_ , _) |- _ =>  move : (HIn) => Foo 
+                                                                 (* case: HIn => [Heq | HIn]; [discr_gen_eq | ] *)
+      | HIn : In (_, _) _ |- _ => move : (HIn) => Bar (* case: HIn => [Heq | HIn]; [discr_gen_eq | ] *)
+    end.
+
+
+    discr_or_first.
+
+    
+case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
                     l r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
     move /frequency_equiv =>  [[n [g [HIn [Hg Hn]]]] | [[H | H] H' //=]];
-    rewrite /gen_from_length /pure in HIn; repeat discr_or_first;
+    rewrite /gen_from_length /pure in HIn. repeat discr_or_first;
     (case: HIn => [[Heq1 Heq2] | HIn]; subst;
                  [by unfold_gen; try_solve | by repeat discr_or_first]).
  -  Opaque mult choose.
@@ -1839,6 +1969,7 @@ split.
     by apply semReturnSize.
 Qed.    
 
+(*
 Lemma foldr_handle : 
   forall obs m mf fr m',
     mem_spec m ->
@@ -1855,6 +1986,50 @@ induction (Mem.get_blocks elems m).
 seq.foldr (fun 
 
 *)
+(*
+Lemma foldGenHandle_correct : 
+  forall obs m l, 
+  mem_spec m -> 
+  (forall b, In b l -> exists fr, Mem.get_frame m b = Some fr) ->
+  semGenSize (foldGen (handle_single_mframe obs inf) l m) size <--> 
+  (fun m' => forall b, 
+               (if in_dec Mem.EqDec_block b l then 
+                  exists fr , Mem.get_frame m b = Some fr /\
+                  exists fr', Mem.get_frame m' b = Some fr' /\
+                             indist obs fr fr' /\
+                             (frame_spec fr') /\
+                             let 'Fr _ _ data := fr in
+                             let 'Fr _ _ data' := fr' in
+                             length data <= length data' <= (length data) + 1 
+               else Mem.get_frame m' b = Mem.get_frame m b) /\
+               mem_spec m').
+Proof. 
+move => obs m l Hspec Hget m'.
+split.
++ { 
+  move : m m' Hget Hspec.
+  induction l as [|x l IHl].
+  - move => m m' Hget Hspec /semFoldGen_right Hsem b.
+    inv Hsem.
+    split => //=.
+  - move => m m' Hget Hspec /semFoldGen_right Hsem b.
+    move : Hsem => /= [m'' H].
+    destruct (Mem.EqDec_block x b) eqn:EqXB.
+    + simpl.
+      have : In b (x :: l) by left.
+      move => /Hget [fr Hfr].
+      split.
+      * exists fr; split => //=.
+        move : H => [/handle_single_mframe_correct Hx Hfold].
+        
+  exists fr'
+    (fun fr' => indist obs fr fr' /\
+     (frame_spec fr') /\
+     let 'Fr _ _ data := fr in
+     let 'Fr _ _ data' := fr' in
+     length data <= length data' <= (length data) + 1).
+*)
+(*
 Lemma gen_vary_memory_correct:
   forall (obs: Label) (m : memory),
     (mem_spec m) ->
@@ -1878,11 +2053,11 @@ Qed.
 Lemma combine_l : forall {A} (l : list A) x y,
                     In (x, y) (combine l l) -> x = y.
 Proof. admit. Qed.
-
+*)
 Require Import ZArith.
 
 Lemma gen_variation_state_correct :
-  gen_variation_state <--> (fun b =>
+  semGenSize gen_variation_state size <--> (fun b =>
                               let '(Var l s1 s2) := b in
                               indist l s1 s2 = true).
 Proof.
@@ -1923,3 +2098,5 @@ Abort.
   (*   rewrite /smart_gen in sgen, sgen2, sgen3, sgen4, sgen5, sgen6, sgen7 . *)
 
 End WithDataLenNonEmpty.
+
+End Sized.
