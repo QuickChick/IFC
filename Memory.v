@@ -88,6 +88,9 @@ Module Type MEM.
     upd_frame m b fr = Some m' ->
     exists fr', get_frame m b = Some fr'.
 
+  Parameter memory_extensionality : 
+    forall {A S} {_:EqDec S eq} (m1 m2 : t A S),
+    (forall (b : block S), get_frame m1 b = get_frame m2 b) -> m1 = m2.
 
   Parameter get_blocks : forall {A S} , list S -> t A S -> list (block S).
 
@@ -186,6 +189,11 @@ Module Mem: MEM.
   Definition t := _t.
 
   Definition get_frame {A S} (m:t A S) := content m.
+
+  Definition memory_extensionality {A S} {_ : EqDec S eq} (m1 m2 : t A S) 
+             (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
+    admit.
+  Qed.
 
   Definition Z_seq z1 z2 := map Z.of_nat (seq (Z.to_nat z1) (Z.to_nat z2)).
 
