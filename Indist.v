@@ -114,27 +114,25 @@ Instance indistMem : Indist memory :=
 
 Proof. abstract by move => obs m; rewrite indistxx. Defined.
 
-(* Indistinguishability of stack frame (pointwise)
+(* Indistinguishability of stack frames (pointwise)
      * The returning pc's must be equal
      * The saved registers must be indistinguishable
      * The returning register must be the same
      * The returning labels must be equal
+
+LL: NOTE: Only applicable to LOW stack frames
 *)
-Instance indistStackFrame : Indist StackFrame :=
-{|
-  indist lab sf1 sf2 :=
+Definition indistLowStackFrame lab sf1 sf2 := 
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
+        if isLow (pc_lab p1) lab || isLow (pc_lab p2) lab then 
+          
            (p1 == p2)
         && indist lab regs1 regs2
         && (r1 == r2 :> Z)
         && (l1 == l2)
-    end
-|}.
-
-Proof.
-  abstract by move => obs [p regs r l]; rewrite !eqxx indistxx.
-Defined.
+        else true
+    end.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   let 'SF ret_addr  _ _ _ := sf in
@@ -147,10 +145,10 @@ Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
 Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
-    indist lab (filterStack lab s1) (filterStack lab s2)
+    forallb2 (indistLowStackFrame lab) (filterStack lab s1) (filterStack lab s2)
 |}.
-
-Proof. abstract by move => obs r; rewrite indistxx. Defined.
+Proof. admit. Defined.
+(* Proof. abstract by move => obs r; rewrite indistxx. Defined.*)
 
 Instance indistImems : Indist imem :=
 {|

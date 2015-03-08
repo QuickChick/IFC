@@ -155,39 +155,20 @@ Instance smart_gen_registers : SmartGen regSet :=
     smart_gen := gen_registers
   |}.
 
-(* Helper for well-formed stacks *)(* CH: probably nonsense *)
-Definition get_stack_label (s : Stack) : Label :=
-  match s with
-    | ST nil => bot
-    | ST ((SF (PAtm _ l) _ _ _) :: _) => l
-  end.
-
-(*
-Definition meet_stack_label (s : Stack) (l : Label) : Stack :=
-  match s with
-    | Mty => Mty
-    | RetCons (PAtm i l', rl, rs, r) s' =>
-      RetCons (PAtm i (label_meet l l'), rl, rs, r) s'
-  end.
-*)
-
-Definition smart_gen_stack_loc (f : Label -> Label -> G Label)
-           (below_pc above_pc : Label) inf : G StackFrame :=
+Definition smart_gen_stack_loc inf : G StackFrame :=
     bindGen (smart_gen inf) (fun regs =>
     bindGen (smart_gen inf) (fun pc   =>
     bindGen (gen_from_nat_length (no_regs inf)) (fun target =>
     bindGen (smart_gen inf) (fun retLab =>
-    bindGen (f below_pc above_pc) (fun l' =>
-    let '(PAtm addr _) := pc in
-    returnGen (SF (PAtm addr l') regs target retLab)))))).
+    returnGen (SF pc regs target retLab))))).
 
 (* Creates the stack. For SSNI just one is needed *)
 (* Make sure the stack invariant is preserved
  - no need since we only create one *)(* CH: probably wrong *)
-Definition smart_gen_stack (pc : Ptr_atom) inf : G Stack :=
+Definition smart_gen_stack inf : G Stack :=
   frequency (pure (ST nil))
             [(1, pure (ST nil));
-             (9, bindGen (smart_gen_stack_loc gen_label_between_lax bot ∂pc inf) (fun sl =>
+             (9, bindGen (smart_gen_stack_loc inf) (fun sl =>
                  returnGen (ST [sl])))].
 
 (* ------------------------------------------------------ *)
@@ -482,7 +463,7 @@ Definition gen_vary_low_stack (obs : Label) (inf : Info) (s : list StackFrame)
 
 Definition gen_vary_stack (obs : Label) (inf : Info) (s : Stack) 
 : G Stack := 
-frequency (returnGen (ST [])) [(1, liftGen ST (gen_vary_low_stack obs inf (unStack s)))].
+ liftGen ST (gen_vary_low_stack obs inf (unStack s)).
 
 Instance smart_vary_stack : SmartVary Stack :=
 {|
@@ -620,7 +601,7 @@ Definition gen_variation_state : G (@Variation State) :=
       (* Generate pc, registers and stack - all pointer stamps are bottom *)
       bindGen (smart_gen inf) (fun pc =>
       bindGen (smart_gen inf) (fun regs =>
-      bindGen (smart_gen_stack pc inf) (fun stk =>
+      bindGen (smart_gen_stack inf) (fun stk =>
       (* Populate the memory - still all stamps are bottom *)
       bindGen (populate_memory inf init_mem) (fun m =>
       (* Instantiate instructions *)
