@@ -699,7 +699,7 @@ Lemma pc_eqS pc pc' l1 l2 :
   (PAtm (BinInt.Z.add pc 1) l1 == PAtm (BinInt.Z.add pc' 1) l2) =
   (PAtm pc l1 == PAtm pc' l2).
 Proof.
-SearchAbout BinInt.Z.add.
+(* SearchAbout BinInt.Z.add. *)
 destruct (PAtm pc l1 == PAtm pc' l2) eqn:Eq.
 + move : Eq.
   move/eqP.

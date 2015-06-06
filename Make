@@ -20,10 +20,10 @@ Shrinking.v
 SingleStateArb.v
 SSNI.v
 GenerationProofsHelpers.v
-#GenerationProofs.v
+GenerationProofs.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
-#Driver.v
+#Driver.v -- run `make tests` for this
 -I compcert/lib
 compcert/lib/Coqlib.v
 compcert/lib/Integers.v
