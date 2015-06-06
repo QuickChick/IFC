@@ -143,7 +143,7 @@ Lemma gen_PC_correct:
   semGenSize (gen_PC inf) size <--> [set pc : Ptr_atom | pc_in_bounds pc].
 Proof.
   rewrite /gen_PC /smart_gen /smart_gen_label /pc_in_bounds
-          semBindSize (eq_bigcupl _ gen_label_correct) => pc.
+          semBindSize (eq_bigcupl _ _ gen_label_correct) => pc.
   split.
   + move => [label [_ /semBindSize[z [/gen_from_length_correct H1
                                       /semReturnSize H2]]]].
@@ -334,7 +334,7 @@ Proof.
       by instantiate (1 := (val, lab)).
     - by apply gen_label_correct.      
     - by [].
-Qed.       
+Qed.
 
 (* regSet  *)
 
@@ -1927,8 +1927,8 @@ split.
   rewrite /handle_single_mframe Hfr.
   apply semBindSize.
   pose proof (H mf) as Hyp.
-  (* I'm not sure how to prove something this obvioues *)
-  have : (Mem.EqDec_block mf mf) by admit. 
+  (* I'm not sure how to prove something this obvious *)
+  have : (Mem.EqDec_block mf mf) by admit.  
   move => EqDec.
   rewrite EqDec in Hyp.
   move : Hyp => [fr' [Hget [Hindist [Hfr' Hlen]]]].
