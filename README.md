@@ -24,7 +24,7 @@ IFC Experiments with QuickChick
     * `Mutate.v` -- generating mutants for mutation testing
   - Testing verification proofs    
     * `GenerationProofsHelpers.v`
-    * `GenerationProofs.v` -- CH: broken since 2f9d25043cf
+    * `GenerationProofs.v`
     * `SSNICheckerProofs.v` -- CH: broken since 2f9d25043cf
   - Noninterference proofs
     * `NotionsOfNI.v` -- proofs relating various noninterference notions
