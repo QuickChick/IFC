@@ -1,6 +1,4 @@
 Require Import ZArith.
-Require Import EquivDec.
-Require Import List.
 
 Require Import ssreflect ssrbool eqtype seq.
 
@@ -143,33 +141,24 @@ Proof.
     right. congruence.
 Defined.
 
-Instance LatEqDec (T : Type) {Lat : JoinSemiLattice T} : EqDec T eq.
-  intros x y.
-  destruct (flows x y) eqn:xy;
-  destruct (flows y x) eqn:yx; try (right; congruence).
-  - left. compute. eauto with lat.
-  - generalize (flows_refl x). intros.
-    right. congruence.
-Defined.
-
 Class Lattice (Lab: Type) :=
 { jslat :> JoinSemiLattice Lab
 ; top : Lab
 ; flows_top : forall l, l <: top
 }.
 
-Class FiniteLattice (Lab : Type) :=
-{
-  lat :> Lattice Lab
-; elems : list Lab
-; all_elems : forall l : Lab, In l elems
-}.
-
-Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
-  filter (fun l' => flows l' l) elems.
-
-Module LabelEqType.
+Module Import LabelEqType.
 
 Canonical label_eqType T {L : JoinSemiLattice T} := Eval hnf in EqType _ (label_eqMixin L).
 
 End LabelEqType.
+
+Class FiniteLattice (Lab : Type) :=
+{
+  lat :> Lattice Lab
+; elems : list Lab
+; all_elems : forall l : Lab, l \in elems
+}.
+
+Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
+  filter (fun l' => flows l' l) elems.

@@ -1,4 +1,3 @@
-Require Import List. Import ListNotations.
 Require Import String.
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 Require Import finset path fingraph. (* These depend on Mathematical Components 1.5
@@ -20,15 +19,15 @@ Export GenericIndist.
 
 
 (* Interface with non-ssr definitions *)
-Lemma replicateE T (a : T) n : replicate n a = nseq n a.
+Lemma replicateE T (a : T) n : replicate a n = nseq n a.
 Proof.
 by elim: n=> //= n ->.
 Qed.
 
 Definition def_atom := Vint 0 @ ⊥.
 
-Lemma nth_errorE T l n (a def : T) : nth_error l n = Some a ->
-  seq.nth def l n = a /\ n < size l.
+Lemma nth_errorE T l n (a def : T) : List.nth_error l n = Some a ->
+  nth def l n = a /\ n < size l.
 Proof.
 by elim: l n => [[]|x l IHl [[->]|]].
 Qed.
@@ -56,13 +55,24 @@ rewrite /update_list_Z; case: (BinInt.Z.ltb rk 0)=> //.
 exact: update_listE.
 Qed.
 
-Definition mframe_eq (m1 m2 : mframe) : bool :=
-  Mem.EqDec_block m1 m2.
-
 (* TODO: prove once mframe is actually made finite *)
 Axiom f : mframe -> ordinal (2^32).
 Axiom g : ordinal (2^32) -> mframe.
 Axiom fgK : cancel f g.
+
+Canonical label_eqType : eqType := Eval hnf in (@LabelEqType.label_eqType _ _).
+
+Axiom label_choiceMixin : choiceMixin Label.
+Canonical label_choiceType := Eval hnf in ChoiceType Label label_choiceMixin.
+
+Axiom label_countMixin : Countable.mixin_of Label.
+Canonical label_countType := Eval hnf in CountType Label label_countMixin.
+
+(* TODO: prove using the assumptions in FINLAT *)
+Axiom label_enumP : Finite.axiom (undup elems).
+
+Definition label_finMixin := FinMixin label_enumP.
+Canonical label_finType := Eval hnf in FinType Label label_finMixin.
 
 Definition mframe_eqMixin := CanEqMixin fgK.
 Canonical mframe_eqType := Eval hnf in EqType mframe mframe_eqMixin.
@@ -80,42 +90,6 @@ Canonical block_eqType := Eval hnf in EqType (Mem.block Label) mframe_eqMixin.
 Canonical block_choiceType := Eval hnf in ChoiceType (Mem.block Label) mframe_choiceMixin.
 Canonical block_countType := Eval hnf in CountType (Mem.block Label) mframe_countMixin.
 Canonical block_finType := Eval hnf in FinType (Mem.block Label) mframe_finMixin.
-
-Canonical label_eqType : eqType := Eval hnf in (@LabelEqType.label_eqType _ _).
-
-Axiom label_choiceMixin : choiceMixin Label.
-Canonical label_choiceType := Eval hnf in ChoiceType Label label_choiceMixin.
-
-Axiom label_countMixin : Countable.mixin_of Label.
-Canonical label_countType := Eval hnf in CountType Label label_countMixin.
-
-(* TODO: prove using the assumptions in FINLAT *)
-Axiom label_enumP : Finite.axiom (undup elems).
-
-Definition label_finMixin := FinMixin label_enumP.
-Canonical label_finType := Eval hnf in FinType Label label_finMixin.
-
-
-Definition eqAtom (a1 a2 : Atom) :=
-  match a1, a2 with
-  | v1@l1, v2@l2 => EqDec_block v1 v2 && (LatEqDec _ l1 l2)
-  end.
-
-Lemma eqAtomP : Equality.axiom eqAtom.
-Proof.
-move=> [xv xl] [yv yl] /=.
-case: (EqDec_block xv yv).
-  rewrite /Equivalence.equiv /= => ->.
-  case: (LatEqDec Label xl yl).
-    by rewrite /Equivalence.equiv /= => ->; constructor.
-  rewrite /Equivalence.equiv /RelationClasses.complement /= => neq_l.
-  by constructor; case.
-rewrite /Equivalence.equiv /RelationClasses.complement /= => neq_v.
-by constructor; case.
-Qed.
-
-Canonical Atom_eqMixin := EqMixin eqAtomP.
-Canonical Atom_eqType := Eval hnf in EqType Atom Atom_eqMixin.
 
 Definition is_low_pointer obs (a : Atom) : bool :=
   if a is Vptr p @ l then isLow l obs else false.
@@ -153,7 +127,7 @@ Proof.
 case/update_list_ZE => ->; set k := BinInt.Z.to_nat rk => lt_k.
 rewrite /mframes_from_atoms; apply/subsetP=> x; rewrite !inE /= !mem_pmap.
 case/mapP=> a; rewrite mem_filter; case/andP => low_pt.
-case/mem_set_nth=> // [<- ->|a_in_r ->].
+move/(mem_set_nth lt_k)=> // [<- ->|a_in_r ->].
   by rewrite [X in _ || X]map_f ?orbT // low_pt inE.
 by rewrite map_f // mem_filter low_pt.
 Qed.
@@ -262,7 +236,7 @@ Lemma stamp_alloc μ μ' sz lab stamp i li fp :
 Proof.
 rewrite /alloc /zreplicate.
 case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz [alloc_sz].
-by rewrite (Mem.alloc_stamp _ _ _ _ _ _ _ _ _ alloc_sz).
+by rewrite (Mem.alloc_stamp _ _ _ _ _ _ _ _ alloc_sz).
 Qed.
 
 Lemma reachable_alloc_int μ μ' sz lab stamp i li fp l f1 f2 :
@@ -270,14 +244,13 @@ Lemma reachable_alloc_int μ μ' sz lab stamp i li fp l f1 f2 :
   reachable l μ' f1 f2 = reachable l μ f1 f2.
 Proof.
 rewrite /alloc /zreplicate.
-case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz.
-rewrite replicateE => [[]] alloc_sz.
+case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz /= [alloc_sz].
 apply/eq_connect=> x y.
 rewrite /link.
 have [<-|neq_fpx] := fp =P x.
   (* How about using implicit arguments? *)
   rewrite (alloc_get_frame_eq _ _ _ _ _ _ alloc_sz) inE /=.
-  rewrite (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ alloc_sz).
+  rewrite (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ alloc_sz).
   set s := filter _ _.
   suff /eqP->: s == [::] by rewrite andbF.
   by rewrite -[_ == _]negbK -has_filter has_nseq andbF.
@@ -293,7 +266,7 @@ Lemma reachable_upd μ μ' pv st lf fr l f1 f2 :
     /\ exists f3, f3 \in mframes_from_atoms l fr /\ reachable l μ f3 f2.
 Proof.
   (* TODO: use splitPl with pv *)
-move=> upd_pv /connectP [p] /shortenP [p'].
+move=> upd_pv /connectP [p] /(@shortenP _ _ f1) [p'].
 have link_not_pv: forall (f : mframe), pv != f -> link l μ' f =1 link l μ f.
   move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /link.
   by rewrite (get_frame_upd_frame_neq _ _ _ _ _ _ _ upd_pv neq_pv).
@@ -303,7 +276,7 @@ have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (link 
   case/andP => neq_pv ?.
   by rewrite IHs // link_not_pv.
 have [in_path|] := boolP (pv \in f1 :: p').
-  case/splitPl: in_path => p1 [|f3 p2 last_p1].
+  case/(@splitPl _ f1 p'): in_path => p1 [|f3 p2 last_p1].
     rewrite cats0 => last_p1 path_p1 uniq_p1 _ ->; left; apply/connectP.
     exists p1 => //; rewrite -path_not_pv //.
     by move: uniq_p1; rewrite lastI last_p1 rcons_uniq => /andP [].
@@ -422,7 +395,7 @@ case: {st st'} step.
     case/connectP=> [[_ ->|]] /=.
       by rewrite (stamp_alloc alloc_i) /= joinA low_join low_KK' low_LPC.
     move=> a s.
-    by rewrite /link /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ _ malloc).
+    by rewrite /link /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ malloc).
   by move: wf_st; rewrite in_stack_f1 orbT; apply.
 (* Load *)
 + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
@@ -609,8 +582,9 @@ Proof.
   case: (BinInt.Z.ltb r 0) => //=.
   elim: {Hlow st1 st2 r} (BinInt.Z.to_nat r) (st_regs st1) (st_regs st2)
         => [|n IH] [|x xs] [|y ys] //=.
-  - by case/andP.
-  - by case/andP => _ /IH.
+  - by case/and3P.
+  - move/(_ xs ys) in IH; rewrite eqSS; case/and3P=> Hs _ H.
+    by apply: IH; rewrite Hs H.
 Qed.
 
 Lemma indist_registerContent obs st1 st2 r v1 :
@@ -642,13 +616,13 @@ Proof.
   elim: {Hlow st1 st2 r} (BinInt.Z.to_nat r) (st_regs st1) (st_regs st2)
         => [|n IH] [|x xs] [|y ys] //=.
   - rewrite /indist /= /indist /indistList //= /indist.
-    by move => /andP [_ ->] ->.
-  - rewrite /indist /= /indist /indistList /=.
-    move/andP => [Hxy Hxsys] Hv1v2.
-    move: IH Hxy => /(_ xs ys Hxsys Hv1v2) {Hxsys Hv1v2}.
+    by rewrite eqSS; move => /and3P [-> _ ->] /= ->.
+  - rewrite /indist /= /indist /indistList /= eqSS.
+    move/and3P => [Hs Hxy Hxsys] Hv1v2.
+    move: IH Hxy => /(_ xs ys); rewrite Hs Hxsys => /(_ erefl Hv1v2) {Hxsys Hv1v2}.
     case: (update_list xs n v1) => [xs'|]; case: (update_list ys n v2) => [ys'|] //=.
-    rewrite /indist /= /indistList /indist.
-    by move => -> ->.
+    rewrite /indist /= /indistList /indist eqSS.
+    by case/andP=> [-> ->] /= ->.
 Qed.
 
 Lemma indist_registerUpdate obs st1 st2 r v1 v2 regs1 :
@@ -699,23 +673,7 @@ Lemma pc_eqS pc pc' l1 l2 :
   (PAtm (BinInt.Z.add pc 1) l1 == PAtm (BinInt.Z.add pc' 1) l2) =
   (PAtm pc l1 == PAtm pc' l2).
 Proof.
-(* SearchAbout BinInt.Z.add. *)
-destruct (PAtm pc l1 == PAtm pc' l2) eqn:Eq.
-+ move : Eq.
-  move/eqP.
-  move => Eq.
-  inversion Eq.
-  subst.
-  apply/eqP.
-  by [].
-+ admit.
-(*  destruct (pc == pc') eqn:PCeq;
-  destruct (l1 == l2)  eqn:Leq;
-  move:PCeq; move/eqP => PCeq; subst;
-  move:Leq; move/eqP => Leq; subst.                         
-  - move:Eq. move/eqP => Eq. unfold not in Eq. 
-    exfalso. apply Eq. auto.
-  *)
+by apply/eqP/eqP=> [[? ->]|[-> ->] //]; congr PAtm; omega.
 Qed.
 
 Lemma indist_mlab obs st1 st2 fp :
@@ -795,16 +753,16 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have /= [[[] // ? ? -> // /andP [/eqP <- indist_addr]]] :=
       indist_registerContent indist_s1s2 low_pc get_r1.
     have /= [[] // [] // ? ? -> // /andP [/eqP <- indist_B] [<-]] :=
-      indist_registerContent indist_s1s2 low_pc get_r2.   
+      indist_registerContent indist_s1s2 low_pc get_r2.
     rewrite /Vector.nth_order /=.
     rewrite /indist /=; case/and4P: indist_s1s2.
-    rewrite low_pc => -> -> /= indist_stack /andP [[/eqP [<- <-]] indist_r].
+    rewrite low_pc => -> -> /= indist_stack /andP [/eqP [<- <-] indist_r].
     apply/andP; split.
       rewrite /indist /indistStack /filterStack /=.
       rewrite flows_join low_pc andbT.
       have [low_K|//] := boolP (isLow K obs).
       move: indist_B; rewrite low_K {1}/indist /= => /eqP [<-].
-      rewrite /indist /=; apply/andP; split => //.
+      rewrite eqSS; case/andP: indist_stack=> -> ->; rewrite /= andbT.
       admit.
     case/orP: indist_addr; first by rewrite flows_join => /negbTE->.
     by move/eqP => [<-]; rewrite indist_r eqxx implybT.

@@ -1,6 +1,4 @@
 Require Import ZArith.
-Require Import List.
-Require Import EquivDec.
 Require Import Instructions.
 
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
@@ -43,7 +41,8 @@ Proof. abstract by move => obs [x|//=]; rewrite indistxx. Defined.
 
 Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
-  indist lab := forallb2 (indist lab)
+  indist lab l1 l2 :=
+    (size l1 == size l2) && all (fun p => indist lab p.1 p.2) (zip l1 l2)
 |}.
 
 Proof.
@@ -104,7 +103,7 @@ Defined.
 *)
 
 Definition blocks_stamped_below (lab : Label) (m : memory) : list frame :=
-  list_of_option (map (Mem.get_frame m) (Mem.get_blocks (allThingsBelow lab) m)).
+  pmap (Mem.get_frame m) (Mem.get_blocks (allThingsBelow lab) m).
 
 Instance indistMem : Indist memory :=
 {|
@@ -122,11 +121,11 @@ Proof. abstract by move => obs m; rewrite indistxx. Defined.
 
 LL: NOTE: Only applicable to LOW stack frames
 *)
-Definition indistLowStackFrame lab sf1 sf2 := 
+Definition indistLowStackFrame lab sf1 sf2 :=
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
-        if isLow (pc_lab p1) lab || isLow (pc_lab p2) lab then 
-          
+        if isLow (pc_lab p1) lab || isLow (pc_lab p2) lab then
+
            (p1 == p2)
         && indist lab regs1 regs2
         && (r1 == r2 :> Z)
@@ -145,7 +144,10 @@ Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
 Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
-    forallb2 (indistLowStackFrame lab) (filterStack lab s1) (filterStack lab s2)
+    let s1' := filterStack lab s1 in
+    let s2' := filterStack lab s2 in
+    (size s1' == size s2')
+    && all (fun p => indistLowStackFrame lab p.1 p.2) (zip s1' s2')
 |}.
 Proof. admit. Defined.
 (* Proof. abstract by move => obs r; rewrite indistxx. Defined.*)

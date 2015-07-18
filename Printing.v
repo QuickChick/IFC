@@ -1,5 +1,4 @@
 Require Import String.
-Require Import List. Import ListNotations.
 Require Import MSetPositive.
 Require Import ZArith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
@@ -8,8 +7,7 @@ Require Import QuickChick.
 
 Require Import TestingCommon.
 
-Require ssreflect eqtype.
-
+Require Import ssreflect eqtype seq.
 Import LabelEqType.
 
 (* High-level note:
@@ -208,14 +206,14 @@ Fixpoint show_pair_list {A : Type} `{_ : Show A} `{_ : ShowPair A}
     | _ => ""
   end ++
   match l1, l2 with
-    | [h1], [h2] =>
+    | [:: h1], [:: h2] =>
       show n ++ " : " ++ show_pair lab h1 h2 ++ " ]"
     | h1 :: t1, h2 :: t2 =>
       show n ++ " : " ++ show_pair lab h1 h2 ++ " , " ++
       show_pair_list (S n) lab t1 t2
-    | h1 :: t1, [] =>
+    | h1 :: t1, [::] =>
       "Cont1 : " ++ numed_contents show (h1::t1) (S n) ++ " ]"
-    | [], h2 :: t2 =>
+    | [::], h2 :: t2 =>
       "Cont2 : " ++ numed_contents show (h2 :: t2) (S n)++ " ]"
     | _, _ => "]"
   end.
@@ -224,10 +222,10 @@ Fixpoint show_pair_list {A : Type} `{_ : Show A} `{_ : ShowPair A}
 Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
          lab (m1 m2 : memory) :=
   match frame_pairs with
-    | [] => ""
+    | [::] => ""
     | (f1, f2) :: t =>
       (* Show mframes *)
-      (if Mem.EqDec_block f1 f2 then show f1
+      (if f1 == f2 then show f1
       else show_variation (show f1) (show f2)) ++ (
       (* Show actual corresponding frames *)
       match Mem.get_frame m1 f1, Mem.get_frame m2 f2 with
@@ -259,7 +257,7 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
 Definition show_high_frames m (mfs : list mframe) :=
   let fix aux (mfs : list mframe) :=
       match mfs with
-        | [] => ""
+        | [::] => ""
         | h :: t =>
           match Mem.get_frame m h with
             | Some f => par (show h) ++ " : " ++ show f ++ nl ++ aux t
@@ -267,7 +265,7 @@ Definition show_high_frames m (mfs : list mframe) :=
           end
       end in
   match mfs with
-    | [] => ""
+    | [::] => ""
     | _ => aux mfs
   end.
 
@@ -282,7 +280,7 @@ Definition show_pair_mem (obs : Label) (m1 m2 : memory)
   "DEBUG: " ++ nl ++
   "fst: " ++ show frames1 ++ nl ++
   "snd: " ++ show frames2 ++ nl ++
-  show_mem_pair_helper (combine frames1 frames2) obs m1 m2 ++ nl ++
+  show_mem_pair_helper (zip frames1 frames2) obs m1 m2 ++ nl ++
   show_high_frames m1 high1 ++ nl ++
   show_high_frames m2 high2 ++ nl.
 
@@ -375,7 +373,7 @@ Fixpoint show_execution (lab : Lab4)
       "-=Step=-" ++ nl ++
       show_pair lab h1 h2 ++ nl ++
       show_execution lab t1 t2
-    | [], [] => ""
-    | [], _ => "Mach 2 continues: FIXME"
-    | _, [] => "Mach 1 continues: FIXME"
+    | [::], [::] => ""
+    | [::], _ => "Mach 2 continues: FIXME"
+    | _, [::] => "Mach 1 continues: FIXME"
   end.

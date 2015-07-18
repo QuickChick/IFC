@@ -1,5 +1,5 @@
 Require Import Labels.
-Require Import List. Import ListNotations.
+Require Import ssreflect ssrfun ssrbool eqtype seq.
 
 (** The four point finite lattice (diamond shape) *)
 Inductive Lab4 : Set :=
@@ -33,9 +33,18 @@ Instance JoinSemiLattice_Lab4 : JoinSemiLattice Lab4 :=
       | H , H  => true
       | _ , _  => false
     end
+; meet l1 l2 :=
+     match l1, l2 with
+       | _ , L  => L
+       | L , _  => L
+       | H , _  => l2
+       | _ , H  => l1
+       | M1, M2 => L
+       | M2, M1 => L
+       | _ , _  => l1 (* l1 == l2 *)
+     end
 }.
 Proof.
-now auto.
 now intros l; destruct l; auto.
 now intros l; destruct l; auto.
 now intros l1 l2 l3; destruct l1, l2, l3; auto.
@@ -48,5 +57,5 @@ Defined.
 Instance Lattice_Lab4 : Lattice Lab4 := { top := H }.
 Proof. intros l; destruct l; auto. Defined.
 
-Instance FiniteLattice_Lab4 : FiniteLattice Lab4 := { elems := [L;M1;M2;H] }.
-Proof. intros l; destruct l; simpl; tauto. Defined.
+Instance FiniteLattice_Lab4 : FiniteLattice Lab4 := { elems := [:: L;M1;M2;H] }.
+Proof. by case. Defined.

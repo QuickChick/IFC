@@ -3,11 +3,9 @@ Import GenLow GenHigh.
 
 Require Import TestingCommon.
 
-Require Import List. Import ListNotations.
 Require Import ZArith.
 
-Require ssreflect eqtype.
-
+Require Import ssreflect eqtype seq.
 Import LabelEqType.
 
 (* ------------------------------------------------------ *)
@@ -56,7 +54,7 @@ Class SmartGen (A : Type) := {
 }.
 
 Definition gen_BinOpT : G BinOpT :=
-  elements BAdd [BAdd; BMult; BJoin; BFlowsTo; BEq].
+  elements BAdd [:: BAdd; BMult; BJoin; BFlowsTo; BEq].
 
 (* Labels *)
 
@@ -75,7 +73,7 @@ Instance smart_gen_label : SmartGen Label :=
   smart_gen _info := gen_label
 |}.
 
-Definition gen_high_label (obs : Label) : G Label := 
+Definition gen_high_label (obs : Label) : G Label :=
   elements H (filter (fun l => negb (isLow l obs)) (allThingsBelow H)).
 
 (* Pointers *)
@@ -91,12 +89,12 @@ Instance smart_gen_pointer : SmartGen Pointer :=
     smart_gen := gen_pointer
   |}.
 
-(* Ints *) 
+(* Ints *)
 Definition gen_int (inf : Info) : G Z :=
   frequency (pure Z0)
-            [(10, arbitrary);
-              (1 , pure Z0);
-              (10, gen_from_length (code_len inf))].
+            [:: (10, arbitrary);
+                (1 , pure Z0);
+                (10, gen_from_length (code_len inf))].
 
 Instance smart_gen_int : SmartGen Z :=
   {|
@@ -108,11 +106,11 @@ Instance smart_gen_int : SmartGen Z :=
 Definition gen_value (inf : Info) : G Value :=
   let '(MkInfo def cl dfs _) := inf in
     frequency (liftGen Vint arbitrary)
-              [(1, liftGen Vint  (smart_gen inf));
+              [:: (1, liftGen Vint  (smart_gen inf));
                       (* prefering 0 over other integers (because of BNZ);
                          prefering valid code pointers over invalid ones *)
-               (1, liftGen Vptr  (smart_gen inf));
-               (1, liftGen Vlab  (smart_gen inf))].
+                  (1, liftGen Vptr  (smart_gen inf));
+                  (1, liftGen Vlab  (smart_gen inf))].
 
 Instance smart_gen_value : SmartGen Value :=
   {|
@@ -167,9 +165,9 @@ Definition smart_gen_stack_loc inf : G StackFrame :=
  - no need since we only create one *)(* CH: probably wrong *)
 Definition smart_gen_stack inf : G Stack :=
   frequency (pure (ST nil))
-            [(1, pure (ST nil));
-             (9, bindGen (smart_gen_stack_loc inf) (fun sl =>
-                 returnGen (ST [sl])))].
+            [:: (1, pure (ST nil));
+                (9, bindGen (smart_gen_stack_loc inf) (fun sl =>
+                    returnGen (ST [:: sl])))].
 
 (* ------------------------------------------------------ *)
 (* ---------- Instruction generation -------------------- *)
@@ -205,9 +203,9 @@ Definition onNonEmpty {A : Type} (l : list A) (n : nat) :=
 Definition ainstrSSNI (st : State) : G Instr :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
-      groupRegisters st regs [] [] [] [] Z0 in
+      groupRegisters st regs [::] [::] [::] [::] Z0 in
   let genRegPtr := gen_from_length (Zlength regs) in
-  frequency (pure Nop) [
+  frequency (pure Nop) [::
     (* Nop *)
     (1, pure Nop);
     (* Halt *)
@@ -260,7 +258,7 @@ Definition ainstrSSNI (st : State) : G Instr :=
 Definition instantiate_instructions st : G State :=
   let '(St im m s r pc) := st in
   bindGen (ainstrSSNI st) (fun instr =>
-  let im' := replicate (length im) instr in
+  let im' := nseq (length im) instr in
   returnGen (St im' m s r pc)).
 
 (* ------------------------------------------------------ *)
@@ -292,22 +290,22 @@ Class SmartVary (A : Type) := {
 
 (* LL: It might be the case that the values don't *have* to be of the same
    constructor, but to get fewer discards it is worth it to keep instructions
-   "valid". I agree however that we need to *keep* the chance that something 
+   "valid". I agree however that we need to *keep* the chance that something
    is changed. *)
 
 Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom) : G Atom :=
   let '(v @ l) := a in
   if flows l obs then returnGen a
   else
-    frequency (returnGen a) 
-      [(1, bindGen (gen_value inf) (fun v => returnGen (v @ l)))
-      ;(9, match v with 
-             | Vint  _ => 
-               liftGen2 Atm (liftGen Vint (smart_gen inf)) (pure l) 
-             | Vptr  p =>  
-               liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l) 
-             | Vlab  _ => 
-               liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l) 
+    frequency (returnGen a)
+      [:: (1, bindGen (gen_value inf) (fun v => returnGen (v @ l)))
+      ;(9, match v with
+             | Vint  _ =>
+               liftGen2 Atm (liftGen Vint (smart_gen inf)) (pure l)
+             | Vptr  p =>
+               liftGen2 Atm (liftGen Vptr (smart_gen inf)) (pure l)
+             | Vlab  _ =>
+               liftGen2 Atm (liftGen Vlab (smart_gen inf)) (pure l)
            end)
        ].
 
@@ -324,7 +322,7 @@ Definition gen_vary_pc (obs: Label) (inf : Info) (pc : Ptr_atom)
   if isLow lpc obs then pure pc
   else
     bindGen (gen_from_length (code_len inf)) (fun pcPtr =>
-    bindGen (gen_high_label obs) (fun pcLab => 
+    bindGen (gen_high_label obs) (fun pcLab =>
     returnGen (PAtm pcPtr pcLab))).
 
 (* This generator fails to generate PCs with label higher that the observability
@@ -442,27 +440,27 @@ Instance indistStack : Indist Stack :=
     indist lab (filterStack lab s1) (filterStack lab s2)
 |}.
 *)
-Definition gen_vary_stack_loc (obs: Label) (inf : Info)   
-           (s : StackFrame)   
+Definition gen_vary_stack_loc (obs: Label) (inf : Info)
+           (s : StackFrame)
 : G StackFrame :=
-    let '(SF pc rs r lab) := s in  
+    let '(SF pc rs r lab) := s in
     (* If the return label is low just vary the registers (a bit) *)
-    if isLow ∂pc obs then   
-      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>  
-      returnGen (SF pc rs' r lab ))  
-    else   
-      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>  
-      bindGen (smart_vary obs inf pc) (fun pc' =>  
-      bindGen (smart_gen inf) (fun lab' =>  
-      bindGen (gen_from_nat_length (no_regs inf)) (fun r' =>  
-      returnGen (SF pc' rs' r' lab'))))).  
+    if isLow ∂pc obs then
+      bindGen (sequenceGen (map (smart_vary obs inf) rs)) (fun rs' =>
+      returnGen (SF pc rs' r lab ))
+    else
+      bindGen (vectorOf (no_regs inf) (smart_gen inf)) (fun rs' =>
+      bindGen (smart_vary obs inf pc) (fun pc' =>
+      bindGen (smart_gen inf) (fun lab' =>
+      bindGen (gen_from_nat_length (no_regs inf)) (fun r' =>
+      returnGen (SF pc' rs' r' lab'))))).
 
-Definition gen_vary_low_stack (obs : Label) (inf : Info) (s : list StackFrame) 
-: G (list StackFrame) := 
+Definition gen_vary_low_stack (obs : Label) (inf : Info) (s : list StackFrame)
+: G (list StackFrame) :=
   sequenceGen (map (gen_vary_stack_loc obs inf) s).
 
-Definition gen_vary_stack (obs : Label) (inf : Info) (s : Stack) 
-: G Stack := 
+Definition gen_vary_stack (obs : Label) (inf : Info) (s : Stack)
+: G Stack :=
  liftGen ST (gen_vary_low_stack obs inf (unStack s)).
 
 Instance smart_vary_stack : SmartVary Stack :=
@@ -548,11 +546,11 @@ Fixpoint gen_init_mem_helper (n : nat) (ml : memory * list (mframe * Z)) :=
 Definition gen_init_mem : G (memory * list (mframe * Z)):=
   bindGen (choose (C.min_no_frames,
                       C.max_no_frames)) (fun no_frames =>
-  gen_init_mem_helper no_frames (Mem.empty Atom Label, [])).
+  gen_init_mem_helper no_frames (Mem.empty Atom Label, [::])).
 
 Definition failed_state : State :=
   (* Property.trace "Failed State!" *)
-                 (St [] (Mem.empty Atom Label) (ST []) [] (PAtm Z0 bot)).
+                 (St [::] (Mem.empty Atom Label) (ST [::]) [::] (PAtm Z0 bot)).
 
 Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
   match Mem.get_frame m mf with
@@ -568,7 +566,7 @@ Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
 Definition populate_memory inf (m : memory) : G memory :=
   (* Isn't this supposed to be exactly what is store in Info's data_len field?*)
   (* let all_frames := Mem.get_all_blocks (top_prin inf) m in *)
-  let all_frames := map fst (data_len inf) in
+  let all_frames := [seq fst p | p <- data_len inf] in
   foldGen (populate_frame inf) all_frames m.
 
 
@@ -593,7 +591,7 @@ Definition gen_variation_state : G (@Variation State) :=
   bindGen gen_init_mem (fun init_mem_info =>
   let (init_mem, dfs) := init_mem_info in
   (* Generate initial instruction list *)
-  let imem := replicate (C.code_len) Nop in
+  let imem := nseq (C.code_len) Nop in
   (* Create initial info - if this fails, fail the generation *)
   match dfs with
     | (def, _) :: _ =>
@@ -621,7 +619,7 @@ Instance arbBinOpT : Arbitrary BinOpT :=
 {|
   arbitrary := @gen_BinOpT;
   shrink o  := match o with
-               | BAdd => nil
-               | _ => [BAdd]
+               | BAdd => [::]
+               | _ => [:: BAdd]
                end
 |}.

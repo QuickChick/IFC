@@ -1,9 +1,14 @@
 (* Machine instructions *)
 
 Require Import ZArith.
-Require Import List. Import ListNotations.
+
+Require Import ssreflect ssrbool eqtype seq.
+Require Import Utils.
 
 Definition regId := Z.
+
+Canonical regId_eqType :=
+  Eval hnf in EqType regId [eqMixin of Z].
 
 Inductive BinOpT : Type :=
 | BAdd
@@ -68,7 +73,8 @@ Inductive OpCode : Type :=
   | OpMLab.
 
 Definition opCodes :=
-  [ OpPut
+  [::
+    OpPut
   ; OpMov
   ; OpLoad
   ; OpStore
@@ -88,12 +94,19 @@ Definition opCodes :=
   ; OpMSize
   ; OpMLab ].
 
-Lemma opCodes_correct : forall o : OpCode, In o opCodes.
-Proof. intro o; simpl; destruct o; tauto. Qed.
-
 Definition opCode_eq_dec : forall o1 o2 : OpCode,
   {o1 = o2} + {o1 <> o2}.
 Proof. decide equality. Defined.
+
+Lemma opCode_eq_decP : Equality.axiom opCode_eq_dec.
+Proof. by move=> o1 o2; apply: sumboolP. Qed.
+
+Definition opCode_eqMixin := EqMixin opCode_eq_decP.
+
+Canonical opCode_eqType := Eval hnf in EqType OpCode opCode_eqMixin.
+
+Lemma opCodes_correct : forall o : OpCode, o \in opCodes.
+Proof. by case. Qed.
 
 Definition opcode_of_instr (i : Instr) : option OpCode :=
   match i with
@@ -122,9 +135,6 @@ Definition opcode_of_instr (i : Instr) : option OpCode :=
 end.
 
 End Instr.
-
-Require Import ssreflect ssrbool eqtype.
-Require Import Utils.
 
 Lemma BinOpT_beqP : Equality.axiom BinOpT_beq.
 Proof.

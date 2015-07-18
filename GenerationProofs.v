@@ -1,19 +1,17 @@
-Require Import List. Import ListNotations.
 Require Import ZArith.
-Require Import EquivDec.
 
 Require Import QuickChick.
- 
+
 Require Import TestingCommon Indist Generation.
 Require Import Sets GenerationProofsHelpers.
 
-Require Import ssreflect ssrbool ssrnat eqtype.
+Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 (* The old version of the semantics for sequence is preferrable for these proofs *)
 Lemma Forall2_combine : forall {A} n (gs : list (G A)) l,
-  Forall2 (fun y => semGenSize y n) gs l ->
-  forall x, In x (seq.zip l gs) -> semGenSize (snd x) n (fst x).
-Proof. 
+  List.Forall2 (fun y => semGenSize y n) gs l ->
+  forall x, List.In x (seq.zip l gs) -> semGenSize (snd x) n (fst x).
+Proof.
   move => A size gs l H.
   induction H as [| x y l l' H1 H2 Hforall ].
   + move => x HIn.
@@ -22,13 +20,13 @@ Proof.
     simpl in *.
     case: HIn => [[]* | HIn]; subst => //=.
     by apply Hforall in HIn; simpl in HIn.
-Qed.    
+Qed.
 
 Lemma seqzip__Forall2 : forall {A} n (gs : list (G A)) l,
   length l == length gs ->
-  (forall x, In x (seq.zip l gs) -> semGenSize (snd x) n (fst x)) ->
-  Forall2 (fun y => semGenSize y n) gs l.
-Proof. 
+  (forall x, List.In x (seq.zip l gs) -> semGenSize (snd x) n (fst x)) ->
+  List.Forall2 (fun y => semGenSize y n) gs l.
+Proof.
   move => A size gs.
   induction gs as [ | g gs IHg].
   + move => l Hlen HIn.
@@ -45,7 +43,7 @@ Proof.
         apply HIn.
         by right.
 Qed.
-    
+
 Section Sized.
 
 Variable size : nat.
@@ -58,28 +56,28 @@ Qed.
 
 Lemma gen_from_length_correct: forall l,
   (Random.leq 0 (l-1))%Z ->
-  semGenSize (gen_from_length l) size <--> 
+  semGenSize (gen_from_length l) size <-->
   (fun z => (Z.le 0 z /\ Z.le z (l-1))).
 Proof.
   move => l H' z; split => /=.
   + move => /semChooseSize H.
     apply H in H'; clear H.
-    split; move : H' => /andP [/= H1 H2]; by apply Zle_bool_imp_le. 
+    split; move : H' => /andP [/= H1 H2]; by apply Zle_bool_imp_le.
   + move => [H1 H2].
-    apply semChooseSize => //=. 
-    apply/andP.                             
+    apply semChooseSize => //=.
+    apply/andP.
     split; by apply Zle_imp_le_bool.
-Qed.    
+Qed.
 
 Lemma gen_from_nat_length_correct: forall l,
-  (Random.leq 0 (Z.of_nat l - 1))%Z ->                                      
-  semGenSize (gen_from_nat_length l) size <--> 
+  (Random.leq 0 (Z.of_nat l - 1))%Z ->
+  semGenSize (gen_from_nat_length l) size <-->
   (fun z => (Z.le 0 z /\ Z.le z ((Z.of_nat l)-1))).
 Proof.
   move => l z.
   rewrite /gen_from_nat_length.
   move/(_ (Z.of_nat l)): gen_from_length_correct; apply.
-  auto.  
+  auto.
 Qed.
 
 Lemma gen_BinOpT_correct :
@@ -91,15 +89,15 @@ Proof.
   case : op; simpl; auto.
   - do 4 right; left; by []. (* I don't know why it doesn't get this *)
 Qed.
- 
+
 Lemma gen_label_correct : semGenSize gen_label size <--> [set: Label].
 Proof.
   rewrite /gen_label /all => l. split => [|?] //=.
   apply semElementsSize. case l; simpl; by tauto.
 Qed.
 
-Lemma gen_high_label_correct (obs : Label) : 
-  isHigh H obs -> 
+Lemma gen_high_label_correct (obs : Label) :
+  isHigh H obs ->
   semGenSize (gen_high_label obs) size <--> [set l : Label | isHigh l obs].
 Proof.
   rewrite /gen_high_label.
@@ -122,13 +120,15 @@ Proof.
     - by left.
     - by right; left.
 Qed.
-              
+
 Section WithDataLenNonEmpty.
 
+Canonical lab4_eqType := (@LabelEqType.label_eqType Label _).
+
 Variable inf : Info.
-Hypothesis data_len_nonempty : data_len inf <> [].
+Hypothesis data_len_nonempty : data_len inf <> [::].
 Hypothesis code_len_correct  : Random.leq Z0 ((code_len inf) - 1)%Z.
-Hypothesis data_len_positive : forall mf z, In (mf,z) (data_len inf) -> 
+Hypothesis data_len_positive : forall mf z, (mf,z) \in (data_len inf) ->
                                             Random.leq Z0 (z-1)%Z.
 Hypothesis no_regs_positive : Random.leq Z0 ((Z.of_nat (no_regs inf)) - 1)%Z.
 Hypothesis frame_sizes_correct : Random.leq C.min_frame_size C.max_frame_size.
@@ -158,11 +158,18 @@ Proof.
     * by apply semReturnSize.
 Qed.
 
+(* FIXME: move this somewhere else *)
+Lemma seq_InP (A : eqType) (x : A) (xs : seq A) :
+  reflect (seq_In xs x) (x \in xs).
+Proof.
+elim: xs=> [|x' xs IH] /=; first by constructor.
+by rewrite inE; apply/(iffP orP)=> [[/eqP ->|/IH]|[->|/IH]]; auto.
+Qed.
 
 (* Pointer *)
 Definition valid_pointer (ptr : Pointer) :=
   let '(Ptr mf addr) := ptr in
-  (exists len, In (mf, len) (data_len inf) /\
+  (exists len, (mf, len) \in (data_len inf) /\
                (0 <= addr <= len - 1)%Z).
 
 Lemma gen_pointer_correct:
@@ -179,9 +186,10 @@ Proof.
       move => /semReturnSize Ret.
       case Ret.
       exists z; split.
-      case H => ?; subst; by [left | right].
+      simpl in H; case: H => H; subst; rewrite /= inE; apply/orP; [by left|right].
+        by apply/seq_InP.
       apply CL.
-      by apply (data_len_positive mf z).
+      by apply (data_len_positive mf z); apply/seq_InP.
   * case: ptr => mf z.
     destruct data_len as [|x xs] eqn:DL.
     - by case data_len_nonempty.
@@ -190,17 +198,17 @@ Proof.
       exists (mf, len); split.
       + apply semElementsSize.
         subst; simpl in HIn.
-        case HIn => ?; by [left | right].
+        by apply/seq_InP.
       + apply semBindSize.
         exists z; split.
         * apply gen_from_length_correct => //=.
           move: EqZ => [HL HH].
           assert (0 <= len - 1)%Z by (eapply Z.le_trans; eassumption).
-          by apply Zle_imp_le_bool.                              
+          by apply Zle_imp_le_bool.
         * by apply semReturnSize.
 Qed.
 
-(* Int *) 
+(* Int *)
 Definition int_spec (z : Z) : Prop :=
   (- Z.of_nat size <= z <= Z.max (Z.of_nat size) (code_len inf - 1))%Z.
 
@@ -242,7 +250,7 @@ split.
       + by left.
       + apply arbInt_correct; omega.
 Qed.
-    
+
 (* Value *)
 
 Definition val_spec (v : Value) : Prop :=
@@ -255,7 +263,7 @@ Definition val_spec (v : Value) : Prop :=
 (* Largely similar proofs now, should probably automate part of it *)
 Lemma gen_value_correct:
     semGenSize (gen_value inf) size <--> val_spec.
-Proof. 
+Proof.
   rewrite /gen_value /val_spec.
   remember inf as Inf.
   clear data_len_nonempty.
@@ -266,7 +274,7 @@ Proof.
   case; rewrite HeqInf.
   + (* VInt *)
     Opaque gen_int.
-    move => z. 
+    move => z.
     split => //.
     - move => /semFrequencySize /=.
       move => [[freq g] [H1 /= H2]].
@@ -277,11 +285,11 @@ Proof.
       by apply gen_int_correct in H1.
     - move => ZSpec.
       apply semFrequencySize => /=.
-      eexists; split.                                  
+      eexists; split.
       * by left.
       * simpl. apply semLiftGenSize.
         exists z; split => //.
-        by apply gen_int_correct.                              
+        by apply gen_int_correct.
   + (* Vptr *)
     Opaque gen_pointer valid_pointer.
     case => mf addr.
@@ -295,15 +303,15 @@ Proof.
       by apply gen_pointer_correct in H1.
     - move => ZSpec.
       apply semFrequencySize => /=.
-      eexists; split.                                  
+      eexists; split.
       * by right; left.
       * simpl. apply semLiftGenSize.
         exists (Ptr mf addr); split => //.
-        by apply gen_pointer_correct.                              
+        by apply gen_pointer_correct.
    + (* Vlab *)
      move => L. split => // _.
      apply semFrequencySize => /=.
-     eexists; split.     
+     eexists; split.
      * by [right; right; left].
      * simpl. apply semLiftGenSize.
        eexists; split => //.
@@ -319,7 +327,7 @@ Definition atom_spec atm  :=
 Lemma gen_atom_correct:
     semGenSize (gen_atom inf) size <--> atom_spec.
 Proof.
-  move => [val lab]. rewrite /gen_atom. 
+  move => [val lab]. rewrite /gen_atom.
   split.
   + move => /semLiftGen2Size /=.
     move => [[val' lab'] [H1 H2]].
@@ -332,7 +340,7 @@ Proof.
     - eapply gen_value_correct.
       rewrite /atom_spec in H.
       by instantiate (1 := (val, lab)).
-    - by apply gen_label_correct.      
+    - by apply gen_label_correct.
     - by [].
 Qed.
 
@@ -340,7 +348,7 @@ Qed.
 
 Definition regs_spec regs :=
   (length regs = no_regs inf) /\
-  (forall reg, In reg regs -> atom_spec reg).
+  (forall reg, reg \in regs -> atom_spec reg).
 
 Lemma gen_registers_correct:
   semGenSize (gen_registers inf) size <--> regs_spec.
@@ -348,14 +356,14 @@ Proof.
   move => regs.
   rewrite /gen_registers. split.
   + move /semVectorOfSize => [H1 H2].
-    split => //. move => reg HIn. by apply/gen_atom_correct; apply H2.
+    split => //. move => reg /seq_InP HIn. by apply/gen_atom_correct; apply H2.
   + move => [Hlen Hregs]. apply/semVectorOfSize. split => // x HIn.
-    apply/gen_atom_correct. by apply Hregs.
+    by apply/gen_atom_correct; apply Hregs; apply/seq_InP.
 Qed.
 
 (* stack_loc *)
 
-Definition valid_reg_ptr ptr_r := 
+Definition valid_reg_ptr ptr_r :=
   (Z0 <= ptr_r <= (Z.of_nat (no_regs inf) - 1))%Z.
 
 Definition stack_loc_spec (t : StackFrame) : Prop :=
@@ -377,15 +385,15 @@ Proof.
     move => /semReturnSize H.
     inv H.
     rewrite /stack_loc_spec.
-    do 2 split => //. 
+    do 2 split => //.
     - apply gen_from_nat_length_correct in Hptr_r.
       * by case Hptr_r.
       * by apply no_regs_positive.
     - by apply gen_PC_correct in Hpc.
 
-  + case: a => [[ret_pc_val ret_pc_lab] regs ptr_r lab] [[Hlen Hregs] [Hptr Hpc_val]]. 
+  + case: a => [[ret_pc_val ret_pc_lab] regs ptr_r lab] [[Hlen Hregs] [Hptr Hpc_val]].
     exists regs; split => //=.
-    - by apply gen_registers_correct.                            
+    - by apply gen_registers_correct.
     apply semBindSize.
     exists (PAtm ret_pc_val ret_pc_lab); split.
     - by apply gen_PC_correct.
@@ -393,7 +401,7 @@ Proof.
     exists ptr_r; split.
     - by apply gen_from_nat_length_correct.
     apply semBindSize.
-    exists lab; split. 
+    exists lab; split.
     - by apply gen_label_correct.
     by apply semReturnSize.
 Qed.
@@ -404,7 +412,7 @@ Definition stack_spec (s: Stack) : Prop :=
   s = ST nil \/
   exists loc, s = ST (loc :: nil) /\ stack_loc_spec loc.
 
-Lemma gen_stack_correct: 
+Lemma gen_stack_correct:
     semGenSize (smart_gen_stack inf) size <--> stack_spec.
 Proof.
   Opaque smart_gen_stack_loc.
@@ -421,7 +429,7 @@ Proof.
       * by apply semReturnSize.
     - eexists; split => /= //.
       * by right; left.
-      * apply semBindSize. 
+      * apply semBindSize.
         exists sf; split => /= //.
         + by apply gen_stack_loc_correct.
         + by apply semReturnSize.
@@ -436,7 +444,7 @@ Definition mem_single_upd_spec mem mf (mem' : memory) :=
                  let 'Fr stamp' lab' data' := fr in
                  lab' = lab /\ stamp' = stamp /\
                  length data' = length data /\
-                 forall atm, In atm data' -> atom_spec atm
+                 forall atm, atm \in data' -> atom_spec atm
     | None => mem' = mem
   end.
 
@@ -445,10 +453,8 @@ Lemma populate_frame_correct :
     semGenSize (populate_frame inf mem mf) size <--> (mem_single_upd_spec mem mf).
 Proof.
   move=> mem mf mem'.  rewrite /populate_frame /mem_single_upd_spec.
-  remember (Mem.get_frame mem mf) as opt.
-  case: opt Heqopt => [fr | ] Heqopt.
-  case: fr Heqopt => stamp lab data Heq.
-  - symmetry in Heq. move/Mem.upd_get_frame : (Heq) => Hupd.
+  case Heq: (Mem.get_frame mem mf)=> [[stamp lab data]|] //=.
+  - move/Mem.upd_get_frame : (Heq) => Hupd.
     split.
     + move /semBindSize => [atmlst [/semVectorOfSize [Hl Hvec] HMatch]].
       move/(_ (Fr stamp lab atmlst)): Hupd => [fr Hfr].
@@ -456,15 +462,15 @@ Proof.
       apply semReturnSize in HMatch.
       inversion HMatch; subst; clear HMatch.
       exists (Fr stamp lab atmlst); repeat split => /= //.
-      move => atm HIn. apply gen_atom_correct. by apply Hvec.
+      move => atm HIn. apply gen_atom_correct. by apply Hvec; apply/seq_InP.
     + move => [fr [Hget H]].
       case: fr Hupd Hget H =>
         stamp' lab' data' Hupd Hget [Heq1 [Heq2 [Heq3 H]]]; subst.
       apply semBindSize.
       exists data'. split.
-      apply semVectorOfSize. split => // x HIn. by apply/gen_atom_correct; eauto.
+      apply semVectorOfSize. split => // x HIn. by apply/gen_atom_correct; apply H; apply/seq_InP; eauto.
       rewrite Hget. by apply semReturnSize.
-  - split. 
+  - split.
     + move => /semReturnSize H. by case H.
     + by move => H; subst; apply semReturnSize.
 Qed.
@@ -472,20 +478,18 @@ Qed.
 (* Memory *)
 
 Lemma zreplicate_spec :
-  forall {A} (v : A) (z : Z),
+  forall {A : eqType} (v : A) (z : Z),
     (0 <= z)%Z ->
     exists (l : list A),
-      (forall x, In x l -> x = v) /\
+      (forall x, x \in l -> x = v) /\
       length l = Z.to_nat z /\
       zreplicate z v = Some l.
 Proof.
-  move => A v z Hle. exists (replicate (Z.to_nat z) v).
+  move => A v z Hle. exists (nseq (Z.to_nat z) v).
   repeat split.
   - move=> x HIn. apply Z2Nat.inj_le in Hle; try omega.
-    induction (Z.to_nat z) as [| n IHn].
-    + contradiction.
-    + destruct HIn as [Heq | HIn]; try (symmetry; assumption).
-      apply IHn; auto; simpl; omega.
+    elim: (Z.to_nat z) HIn => [| n IHn] //=.
+    rewrite /= inE=> /orP [/eqP Heq | HIn]; try assumption; auto.
   - apply Z2Nat.inj_le in Hle; try omega.
     induction (Z.to_nat z) as [| n IHn].
     + reflexivity.
@@ -495,25 +499,20 @@ Proof.
 Qed.
 
 Lemma zreplicate_eq :
-  forall {A} (l: list A) v z,
+  forall {A : eqType} (l: list A) v z,
     (0 <= z)%Z ->
-    (forall x, In x l ->  x = v) ->
+    (forall x, x \in l ->  x = v) ->
     length l = Z.to_nat z ->
     zreplicate z v = Some l.
 Proof.
   move => A l v x Hle HIn Heq.
   rewrite /zreplicate. destruct ( Z_lt_dec x 0 ) as [H | H].
   - omega.
-  - apply Z2Nat.inj_le in Hle; try omega.
-    clear H Hle. generalize dependent l. induction (Z.to_nat x) as [| n IHn].
-    + simpl. intros l. destruct l; try discriminate. reflexivity.
-    + simpl. intros l HIn Hlen. apply f_equal. destruct l; try discriminate.
-      rewrite (HIn a (in_eq a l)). apply f_equal.
-      inversion Hlen as [Hlen'].
-      assert (Hsome: Some (replicate n v) = Some l).
-      { apply IHn; auto. intros x' HIn'. apply HIn. apply in_cons.
-        assumption. } rewrite Hlen'.
-      inversion Hsome. reflexivity.
+  - apply Z2Nat.inj_le in Hle; try omega; simpl.
+    clear H Hle. congr Some. rewrite -{}Heq.
+    elim: l HIn=> [|a l IH] //= HIn; congr cons.
+      by symmetry; apply: HIn; rewrite inE eqxx.
+    by apply: IH=> a' Pa'; apply: HIn; rewrite inE Pa' orbT.
 Qed.
 
 Definition init_mem_spec (size : nat) (m : memory)
@@ -522,17 +521,17 @@ Definition init_mem_spec (size : nat) (m : memory)
   exists (lst : list (Label * (list Atom))),
     length lst = size /\
     (forall l data,
-        In (l, data) lst ->
+        (l, data) \in lst ->
         (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
-        (forall v, In v data ->  v = (Vint 0 @ bot))) /\
+        (forall v, v \in data ->  v = (Vint 0 @ bot))) /\
     (m', blocks') =
-    fold_left
+    foldl
       (fun (ml : memory * (list (mframe * Z))) (elem : Label * (list Atom))  =>
          let '(l, data) := elem in
          let '(m_i, bs) := ml in
          let (b, m) := Mem.alloc Local m_i bot (Fr bot l data) in
          (m, (b, Z.of_nat (length data)) :: bs)
-      ) lst (m, blocks).
+      ) (m, blocks) lst.
 
 Definition mem_constraints (m : memory) :=
   forall b l st data,
@@ -550,19 +549,19 @@ Lemma gen_init_mem_helper_correct:
     (mem_constraints m) ->
     semGenSize (gen_init_mem_helper n (m, blocks)) size <-->
     (fun p => init_mem_spec n m blocks (fst p) (snd p)).
-Proof. 
-  move => n m blocks Hspec [m' lst']. rewrite /init_mem_spec. split. 
+Proof.
+  move => n m blocks Hspec [m' lst']. rewrite /init_mem_spec. split.
   { move => Hgen. generalize dependent m. generalize dependent blocks.
-      induction n as [| n IHn]; intros blocks mem Hspec Hgen. 
-      - exists []. repeat split => /= //.
+      induction n as [| n IHn]; intros blocks mem Hspec Hgen.
+      - exists [::]. repeat split => /= //.
         rewrite /gen_init_mem_helper in Hgen. by apply semReturnSize in Hgen.
       - rewrite /gen_init_mem_helper in Hgen.
         fold gen_init_mem_helper in Hgen.
         apply semBindSize in Hgen.
         move : Hgen => [len [Hchoose /semBindSize [lab [Hlab Hgen]]]].
 
-        move: Hchoose => /semChooseSize H. 
-        apply H in frame_sizes_correct; clear H. 
+        move: Hchoose => /semChooseSize H.
+        apply H in frame_sizes_correct; clear H.
         move: frame_sizes_correct => /andP [/= /Zle_bool_imp_le Hle1 /Zle_bool_imp_le Hle2].
         rewrite /C.min_frame_size /C.max_frame_size in Hle1 Hle2 *.
         unfold alloc in Hgen.
@@ -576,34 +575,37 @@ Proof.
           symmetry in Heqalloc. move : (Heqalloc) => Halloc.
           move => fr' lab' st' data' Hget.
           apply Mem.alloc_get_frame with (b' := fr') in Halloc.
-          destruct (equiv_dec fr fr').
-          * inv e. rewrite Halloc in Hget. inv Hget.
+          move: Halloc; rewrite Hget.
+          have [efr|nefr] := altP (fr =P fr').
+          * move=> [???]; subst st' lab' data' fr'.
             rewrite /C.min_frame_size /C.max_frame_size Heq.
             repeat split => //=; try (simpl in *; rewrite Z2Nat.id; omega).
             by eapply Mem.alloc_stamp; apply Heqalloc.
-          * eapply Hspec. rewrite -Halloc. eassumption.
-        + rewrite Heq. simpl in *; rewrite Z2Nat.id. by []. omega.
+          * move=> Halloc. eapply Hspec. rewrite -Halloc. eauto.
+        + rewrite Heq. simpl in *; rewrite Z2Nat.id; last omega.
+          by move: Hgen; rewrite -Heqalloc.
         + exists ((lab, data) :: lst). split. by subst.
-          split => //=. 
-          * move => l data' [[eq1 eq2] | H]; subst. 
-            split => //. rewrite Heq //. rewrite Z2Nat.id. split => //. 
+          split => //=.
+          * move => l data'; rewrite inE=> /orP [/eqP [eq1 eq2] | H]; subst.
+            split => //. rewrite Heq //. rewrite Z2Nat.id. split => //.
             eapply Z.le_trans; [| apply Hle1] => //.
-            edestruct Hforall as [Hrng HIn']. apply H. 
+            edestruct Hforall as [Hrng HIn']. apply H.
             split; auto. simpl in Hfold. rewrite Hfold.
             by rewrite -Heqalloc. }
   { move => [lst [Hlen [HIn Hfold]]]. generalize dependent lst.
     generalize dependent m. generalize dependent blocks.
     induction n as [| n IHn]; intros blocks m Hspec lst Hlen HIn Hfold.
     - destruct lst; simpl in *.
-      by apply semReturnSize. 
+      by apply semReturnSize.
       congruence.
     - rewrite /gen_init_mem_helper. fold gen_init_mem_helper. apply semBindSize.
       destruct lst as [|[lab data] lst]. simpl in Hlen; congruence.
       destruct (HIn lab data) as [[Hle1 Hle2] HInx]; try by apply in_eq.
+        by rewrite inE eqxx.
       exists (Z.of_nat (length data)). split.
       + apply semChooseSize.
         by apply frame_sizes_correct.
-        apply/andP. 
+        apply/andP.
         split; by apply Zle_imp_le_bool.
       + apply semBindSize.
         exists lab. split; try by apply gen_label_correct.
@@ -616,16 +618,16 @@ Proof.
           move => block lab' st' data' Hget.
           symmetry in Heqfrm. move: (Heqfrm)=> Halloc.
           apply Mem.alloc_get_frame with (b' := block) in Halloc.
-          destruct (equiv_dec fr1 block).
-          - inv e.  rewrite Hget in Halloc. inv Halloc.
+          move: Halloc; have [efr|nefr] := altP (fr1 =P _).
+          - rewrite {}Hget => - [???]; subst st' lab' data' block.
             split => //. split => //.
             eapply Mem.alloc_stamp.
             apply Heqfrm.
-          - rewrite Halloc in Hget. rewrite /mem_constraints in Hspec.
+          - rewrite Hget. rewrite /mem_constraints in Hspec => e.
               eapply Hspec; by eauto.
        * by inversion Hlen.
        * move => lab' data' HIn'.
-         apply in_cons with (a := (lab, data)) in HIn'. by apply HIn in HIn'.
+         by apply: (HIn lab'); rewrite inE; apply/orP; right.
        * simpl in Hfold. by rewrite -Heqfrm in Hfold. }
 Qed.
 
@@ -635,7 +637,7 @@ Lemma gen_init_mem_correct:
     (fun ml =>
        (exists n,
           C.min_no_frames <= n <= C.max_no_frames /\
-          init_mem_spec n (Mem.empty Atom Label) [] (fst ml) (snd ml))).
+          init_mem_spec n (Mem.empty Atom Label) [::] (fst ml) (snd ml))).
   Proof.
     move => top init_mem. split.
     { unfold gen_init_mem.
@@ -647,8 +649,8 @@ Lemma gen_init_mem_correct:
       - move => b l st data Hget.
         by rewrite Mem.get_empty in Hget.
       - destruct (Hl Hgen) as [lst H].
-        split => //. apply/andP. split => //. 
-        by eauto. 
+        split => //. apply/andP. split => //.
+        by eauto.
         assumption.
     }
     { move => [len [/andP [Hle1 Hle2] Hspec]].
@@ -661,7 +663,7 @@ Lemma gen_init_mem_correct:
         exists len. split.
         + apply semChooseSize. split => //.
           apply/andP. by split.
-          by auto. 
+          by auto.
     }
 Qed.
 
@@ -675,15 +677,15 @@ Definition init_mem_single_upd_spec (mem : Mem.t Atom Label)
          lab' = lab /\
          stamp' = stamp /\
          length data' = length data /\
-         (forall atm : Atom, In atm data' -> atom_spec atm))
+         (forall atm : Atom, atm \in data' -> atom_spec atm))
     | None => mem' = mem
   end.
 
 Definition populated_memory_spec (m : memory) (m': memory) :=
-  let blocks := map fst (data_len inf) in
-  seq.foldr (fun block (p : memory -> Prop) m_prev =>
-               exists m, (mem_single_upd_spec m_prev block m) /\ p m)
-            (eq m') blocks m /\
+  let blocks := [seq fst p | p <- data_len inf] in
+  foldr (fun block (p : memory -> Prop) m_prev =>
+           exists m, (mem_single_upd_spec m_prev block m) /\ p m)
+        (eq m') blocks m /\
   (forall b st lab d,
      Mem.get_frame m' b = Some (Fr st lab d) ->
      st = bot /\
@@ -694,7 +696,7 @@ Definition populated_memory_spec (m : memory) (m': memory) :=
   forall {A B : Type} (f : A -> B -> G A) (bs : list B) (a0 : A) (s : nat),
     semGenSize (foldGen f bs a0) s <-->
     [ set an |
-      foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)]) 
+      foldr (fun b p => [set a_prev | exists a, a \in (semGenSize (f a_prev b) s :&: p)])
             [set an] bs a0].
 Pr *)
 
@@ -709,10 +711,10 @@ Proof.
   { unfold populate_memory.
     move => /semFoldGen_right Hgen. rewrite /populated_memory_spec.
     generalize dependent m.
-    set lst := ((map fst (data_len inf))).
+    set lst := ((map _ (data_len inf))).
     induction lst as [| b bs IHbs]; move=> m Hinit Hfold.
     rewrite /mem_constraints in Hinit.
-    - simpl in *; subst. 
+    - simpl in *; subst.
       inversion Hfold; subst; clear Hfold.
       split => // b st l d /Hinit [? [? ?]];
       by repeat split => //.
@@ -720,19 +722,19 @@ Proof.
      have Hcnstr: mem_constraints m''.
      { rewrite /populate_frame in Hpop.
        remember (Mem.get_frame m b) as get.
-       destruct get as [[st l d]|]. 
+       destruct get as [[st l d]|].
        * symmetry in Heqget.
          apply semBindSize in Hpop.
          case : Hpop => [d' [/semVectorOfSize [Hlen Hforall] Hupd]].
-         destruct (Mem.upd_get_frame _ _ _ _ _ _ (Fr st l d') Heqget)
+         destruct (Mem.upd_get_frame _ _ _ _ _ (Fr st l d') Heqget)
            as [fr Hupd'].
-         rewrite Hupd' in Hupd. 
-         apply semReturnSize in Hupd. 
+         rewrite Hupd' in Hupd.
+         apply semReturnSize in Hupd.
          inv Hupd. rewrite /mem_constraints.
          destruct (Hinit _ _ _ _ Heqget) as [? [? ?]].
          subst. move => b' l' st' d'' Hget.
-         move: (Mem.get_upd_frame _ _ _ m m'' _ _ Hupd' b') => Hget'.
-         case: (equiv_dec b b') Hget' => e Hget'.  inv e.
+         move: (Mem.get_upd_frame _ _ m m'' _ _ Hupd' b') => Hget'.
+         case: (b =P b') Hget' => e Hget'.  inv e.
          - rewrite Hget in Hget'. inv Hget'. split => //.
            split; [rewrite Hlen | repeat split => //]; omega.
          - rewrite Hget in Hget'. symmetry in Hget'.
@@ -745,28 +747,26 @@ Proof.
      by apply populate_frame_correct. }
   { rewrite /populated_memory_spec /populate_memory. move => [Hfold Hconstr].
     apply semFoldGen_right. generalize dependent m.
-    set lst := ((map fst (data_len inf))).
+    set lst := ((map _ (data_len inf))).
     induction lst as [| b bs IHbs]; move=> m Hinit Hfold.
     + by simpl in *.
     + simpl in *. move : Hfold => [m'' [Hupd Hfold]]. eexists. split => //.
       * apply populate_frame_correct. eassumption.
       * apply IHbs => //. rewrite /mem_single_upd_spec in Hupd.
-       remember (Mem.get_frame m b) as get.
-       destruct get as [[st l d]|]; try by inv Hupd.
-       symmetry in Heqget.
-       move : Hupd => [[st' l' d'] [Hupd' [eq1 [eq2 [Hlen Hforall]]]]]; subst.
-       destruct (Mem.upd_get_frame _ _ _ _ _ _ (Fr st l d') Heqget)
-         as [fr Hupd''].
-       rewrite Hupd'' in Hupd'. inv Hupd'. rewrite /mem_constraints.
-       destruct (Hinit _ _ _ _ Heqget) as [? [? ?]].
-       subst. move => b' l' st' d'' Hget.
-       move: (Mem.get_upd_frame _ _ _ m m'' _ _ Hupd'' b') => Hget'.
-       case: (equiv_dec b b') Hget' => e Hget'.  inv e.
-       - rewrite Hget in Hget'. inv Hget'. split => //.
-         split; [rewrite Hlen | repeat split => //]; omega.
-       - rewrite Hget in Hget'. symmetry in Hget'.
-         destruct (Hinit _ _ _ _ Hget') as [? [? ?]].
-         repeat split => //. }
+        case Heqget: (Mem.get_frame m b) Hupd=> [[st l d]|] Hupd; try by inv Hupd.
+        move : Hupd => [[st' l' d'] [Hupd' [eq1 [eq2 [Hlen Hforall]]]]]; subst.
+        destruct (Mem.upd_get_frame _ _ _ _ _ (Fr st l d') Heqget)
+          as [fr Hupd''].
+        rewrite Hupd'' in Hupd'. inv Hupd'. rewrite /mem_constraints.
+        destruct (Hinit _ _ _ _ Heqget) as [? [? ?]].
+        subst. move => b' l' st' d'' Hget.
+        move: (Mem.get_upd_frame _ _ m m'' _ _ Hupd'' b') => Hget'.
+        case: (b =P b') Hget' => e Hget'.  inv e.
+        - rewrite Hget in Hget'. inv Hget'. split => //.
+           split; [rewrite Hlen | repeat split => //]; omega.
+        - rewrite Hget in Hget'. symmetry in Hget'.
+          destruct (Hinit _ _ _ _ Hget') as [? [? ?]].
+          repeat split => //. }
 Qed.
 
 (* Instruction *)
@@ -774,40 +774,40 @@ Qed.
 Definition Instruction_spec (st : State) (instr : @Instr Label) :=
   let '(St im m stk regs pc ) := st in
   let '(dptr, cptr, num, lab) :=
-      groupRegisters st regs [] [] [] [] Z0 in
+      groupRegisters st regs [::] [::] [::] [::] Z0 in
   match instr with
-    | PcLab z | PutLab _ z 
+    | PcLab z | PutLab _ z
     | Put _ z => (0 <= z <= (Zlength regs -1))%Z
     | Mov z1 z2 => (0 <= z1 <= (Zlength regs -1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
 
-    | MLab z1 z2 | Load z1 z2 | Store z1 z2 | MSize z1 z2 | PGetOff z1 z2 
+    | MLab z1 z2 | Load z1 z2 | Store z1 z2 | MSize z1 z2 | PGetOff z1 z2
     | Write z1 z2 =>
-      dptr <> [] /\ In z1 dptr /\  (0 <= z2 <= (Zlength regs-1))%Z
-                                                  
+      dptr <> [::] /\ z1 \in dptr /\  (0 <= z2 <= (Zlength regs-1))%Z
+
     | Nop => True | Halt => False
     | Lab z1 z2 =>
       (0 <= z1 <= (Zlength regs-1))%Z /\ (0 <= z2 <= (Zlength regs-1))%Z
- 
+
     | BCall z1 z2 z3 =>
-      cptr <> [] /\ lab <> [] /\
-      In z1 cptr /\ In z2 lab /\  (0 <= z3 <= (Zlength regs-1))%Z
-    | BRet => 
-      match stk with 
-        | ST [] => False 
-        | ST _  => True 
+      cptr <> [::] /\ lab <> [::] /\
+      z1 \in cptr /\ z2 \in lab /\  (0 <= z3 <= (Zlength regs-1))%Z
+    | BRet =>
+      match stk with
+        | ST [::] => False
+        | ST _  => True
       end
     | Alloc z1 z2 z3 =>
-      num <> [] /\ lab <> [] /\
-      In z1 num /\ In z2 lab /\  (0 <= z3 <= (Zlength regs-1))%Z
-    | Jump z => cptr <> [] /\ In z cptr
-    | BNZ z1 z2 => num <> [] /\ (-1 <= z1 <= 2)%Z /\ In z2 num
+      num <> [::] /\ lab <> [::] /\
+      z1 \in num /\ z2 \in lab /\  (0 <= z3 <= (Zlength regs-1))%Z
+    | Jump z => cptr <> [::] /\ z \in cptr
+    | BNZ z1 z2 => num <> [::] /\ (-1 <= z1 <= 2)%Z /\ z2 \in num
     | PSetOff z1 z2 z3 =>
-      dptr <> [] /\ num <> [] /\
-      In z1 dptr /\ In z2 num /\  (0 <= z3 <= (Zlength regs-1))%Z
+      dptr <> [::] /\ num <> [::] /\
+      z1 \in dptr /\ z2 \in num /\  (0 <= z3 <= (Zlength regs-1))%Z
     | BinOp BAdd z1 z2 z3 | BinOp BMult z1 z2 z3 | BinOp BEq z1 z2 z3 =>
-      num <> [] /\ In z1 num /\ In z2 num /\ (0 <= z3 <= (Zlength regs-1))%Z
+      num <> [::] /\ z1 \in num /\ z2 \in num /\ (0 <= z3 <= (Zlength regs-1))%Z
     | BinOp BJoin z1 z2 z3 | BinOp BFlowsTo z1 z2 z3 =>
-      lab <> [] /\ In z1 lab /\ In z2 lab /\ (0 <= z3 <= (Zlength regs-1))%Z
+      lab <> [::] /\ z1 \in lab /\ z2 \in lab /\ (0 <= z3 <= (Zlength regs-1))%Z
 
   end.
 
@@ -841,7 +841,7 @@ Ltac discr_gen_eq :=
 Ltac discr_or_first :=
   match goal with
     | HIn : ((_, _) = (_ , _) \/ _) |- _ =>  case: HIn => [Heq | HIn]; [discr_gen_eq | ]
-    | HIn : In (_, _) _ |- _ => case: HIn => [Heq | HIn]; [discr_gen_eq | ]
+    | HIn : (_, _) \in _ |- _ => case/orP: HIn => [Heq | HIn]; [discr_gen_eq | ]
   end.
 
 (*
@@ -883,7 +883,7 @@ Ltac try_solve :=
             by case: b Hif
         | |- (_ <= _)%Z => by apply/Zle_bool_imp_le
         | |- _ => by []
-      end. 
+      end.
 
 
 
@@ -945,54 +945,54 @@ Ltac try_solve2 :=
     | |- gen_BinOpT _ => by apply gen_BinOpT_correct
     | |- ~ (if ?b then _ else _) = 0 => by destruct b
     | _ => by []
-  end. 
+  end.
  *)
 
 Ltac solver :=
-  match goal with 
-    | Hl : _ (_,_) , Hsem : semGenSize _ _ _ |- _ => 
+  match goal with
+    | Hl : _ (_,_) , Hsem : semGenSize _ _ _ |- _ =>
   case : Hl => [[] * | Hl];
        [ subst; simpl in Hsem;
-         match goal with 
-           | H : semGenSize (pure _) size _ |- _ => 
-             apply semReturnSize in Hsem; 
+         match goal with
+           | H : semGenSize (pure _) size _ |- _ =>
+             apply semReturnSize in Hsem;
                inv Hsem
-           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGenSize [? [x H]];
              inv H
-           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
              rewrite /prod_curry in H; [inv H]
            | H : semGenSize (liftGen3 _ _ _ _) _ _ |- _ =>
              move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]];
              discriminate
-           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ => 
-             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ =>
+             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]];
              discriminate
            | _ => idtac
          end | solver ]
-    | Hl : (_,_) = (_,_) \/ _ , Hsem : semGenSize _ _ _ |- _ => 
+    | Hl : (_,_) = (_,_) \/ _ , Hsem : semGenSize _ _ _ |- _ =>
       case : Hl => [[] * | Hl];
        [ subst; simpl in Hsem;
-         match goal with 
-           | H : semGenSize (pure _) size _ |- _ => 
-             apply semReturnSize in Hsem; 
+         match goal with
+           | H : semGenSize (pure _) size _ |- _ =>
+             apply semReturnSize in Hsem;
                inv Hsem
-           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGenSize [? [x H]];
              inv H
-           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
              rewrite /prod_curry in H; [inv H]
            | H : semGenSize (liftGen3 _ _ _ _) _ _ |- _ =>
              move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]];
              discriminate
-           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ => 
-             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+           | H : semGenSize (liftGen4 _ _ _ _ _) _ _ |- _ =>
+             move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]];
              discriminate
            | _ => idtac
          end | solver ]
@@ -1001,7 +1001,7 @@ Ltac solver :=
 
 (*
 Lemma gen_ainstrSSNI_correct :
-  forall (st : State), 
+  forall (st : State),
     (Random.leq Z0 (Zlength (st_regs st) -1))%Z ->
     semGenSize (ainstrSSNI st) size <--> (Instruction_spec st).
 Proof.
@@ -1014,10 +1014,10 @@ Proof.
              st_pc := pc |}.
   case: (groupRegisters st regs [] [] [] [] Z0)=> [[[dptr cptr] num] lab].
   split.
-  - destruct instr; 
+  - destruct instr;
     move =>  /semFrequencySize HSem;
     rewrite /onNonEmpty in HSem.
-   
+
     destruct dptr; destruct cptr; destruct num; destruct lab; destruct (unStack stk);
     simpl in HSem;
     move : HSem => [[freq g] [Hl Hsem]];
@@ -1031,8 +1031,8 @@ Proof.
     move : HSem => [[freq g] [Hl Hsem]];
     solver;
     try solve [inv Hl];
-    repeat match goal with 
-             | |- (_ <= _ <= _)%Z /\ _ => split 
+    repeat match goal with
+             | |- (_ <= _ <= _)%Z /\ _ => split
              | H : setX _ _ _ |- _ => move : H => [H1 H2]
            end; by apply gen_from_length_correct.
       match goal with
@@ -1044,45 +1044,45 @@ Proof.
     try solve [
     move : H => [H1 H2]; by apply gen_from_length_correct];
 
-             move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]]; 
+             move : Hsem => /semLiftGen3Size [? [? [? [? [? [? ?]]]]]];
              discriminate.
-    move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]]; 
+    move : Hsem => /semLiftGen4Size [? [? [? [? [? [? [? [? ?]]]]]]]];
                   discriminate.
 
     repeat (case : Hl => [[] * | Hl];
-       [ subst; simpl in Hsem; 
-         match goal with 
-           | H : semGenSize (pure _) size _ |- _ => 
-             apply semReturnSize in Hsem; 
+       [ subst; simpl in Hsem;
+         match goal with
+           | H : semGenSize (pure _) size _ |- _ =>
+             apply semReturnSize in Hsem;
                inv Hsem
-           | H : semGenSize (liftGen _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGenSize [? [x H]];
              inv H
-           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ => 
+           | H : semGenSize (liftGen2 _ _ _) _ _ |- _ =>
              let x := fresh in
              move : Hsem => /semLiftGen2Size [[freq' g'] [x H]];
              rewrite /prod_curry in H; [inv H]
            | _ => idtac
          end | ]).
     rewrite /Random.leq.
-    by 
+    by
     apply gen_from_length_correct in H2.
-    
+
     rewrite /prod_curry in Hsem.
     inv Hsem.
-    
+
     case : Hl => [[] * | Hl].
     subst; simpl in Hsem.
-    match goal with 
-      | H : semGenSize (liftGen _ _) _ _ |- _ => 
+    match goal with
+      | H : semGenSize (liftGen _ _) _ _ |- _ =>
         move : Hsem => /semLiftGenSize [? [? ?]] //=
     end.
-    
+
 
     apply semReturnSize in Hsem.
     match goal with
-      | HIn : (_ , _) \/ _) = (_ , _) |- _ =>  move : (HIn) => Foo 
+      | HIn : (_ , _) \/ _) = (_ , _) |- _ =>  move : (HIn) => Foo
                                                                  (* case: HIn => [Heq | HIn]; [discr_gen_eq | ] *)
       | HIn : In (_, _) _ |- _ => move : (HIn) => Bar (* case: HIn => [Heq | HIn]; [discr_gen_eq | ] *)
     end.
@@ -1090,7 +1090,7 @@ Proof.
 
     discr_or_first.
 
-    
+
 case: instr => [r1 r2 | r1 r2 | r | r1 r2 r3 | | r1 r2 r3 | r1 r2 r3 |
                     l r | | z r | bop r1 r2 r3 | r | z r | r1 r2 | r1 r2 |
                     r1 r2 r3 | r1 r2 r3 | r | | r1 r2 | r1 r2];
@@ -1136,27 +1136,9 @@ Proof.
 
     * (* Completeness *)
       move=> [/andP [/andP [Hflows1 Hflows2] /orP [H1 //= | H1]] H2].
-      rewrite /indist /indistValue in H1. apply semReturnSize. 
+      rewrite /indist /indistValue in H1. apply semReturnSize.
       move: (flows_antisymm _ _ Hflows2 Hflows1) => Heq; subst.
-      case: va Hspec H1 H2 => [i | ptr | lv];
-      case: va' => [i' | ptr' | lv'] => // Hspec H1 H2; 
-      unfold eq_op in H1;
-      rewrite /eqP /= in H1 => /=;
-      unfold eq_op in H1;                        
-      rewrite /eqP /= in H1 => /=.
-      - apply Z.eqb_eq in H1; by subst .
-      - by destruct ptr.
-      - destruct ptr; destruct ptr'.
-        move:H1 => /andP [Hf1 Hf2].
-        apply Z.eqb_eq in Hf2.
-        unfold mframe_eq in Hf1. 
-        case: (Mem.EqDec_block fp fp0) Hf1 => //=.
-        rewrite /equiv.    
-        by move => Heq _; subst.
-      - by destruct ptr.
-      - unfold label_eqb in H1.
-        move/andP : H1 => [Hl1 Hl2].
-        by move: (flows_antisymm _ _ Hl1 Hl2) => Heq; subst.
+      by move/eqP in H1; subst va'.
   + (* la higher than observable state *)
     split.
     * (* Correctness *)
@@ -1190,7 +1172,7 @@ Proof.
       move=> [/andP[/andP [H1 H2] /orP [_| H3]]   H];
       apply semFrequencySize => //=;
       eexists; split;
-      [ by left |  | by left | ]; 
+      [ by left |  | by left | ];
         simpl; apply semBindSize;
         exists va'; split => //.
       - by apply gen_value_correct.
@@ -1203,7 +1185,7 @@ Qed.
 Lemma gen_vary_pc_correct:
   forall (obs: Label) (pc : Ptr_atom),
     (pc_in_bounds pc) ->
-    semGenSize (gen_vary_pc obs inf pc) size <--> 
+    semGenSize (gen_vary_pc obs inf pc) size <-->
     (fun pc' => (if isLow ∂pc obs then pc == pc' else isHigh ∂pc' obs) /\ pc_in_bounds pc').
 Proof.
   move => obs [pc_a pc_l] Hspec pc'.
@@ -1217,7 +1199,7 @@ Proof.
     + move => [H1 H2].
       apply semReturnSize.
       by move: H1 => /eqP ->.
-  - split.     
+  - split.
     + move => /semBindSize [xa [/gen_from_length_correct H1 H2]].
       move: H2 => /semBindSize [xl [/gen_high_label_correct H3 /semReturnSize H4]].
       apply H1 in code_len_correct; clear H1; rename code_len_correct into H1.
@@ -1237,7 +1219,7 @@ Proof.
         - apply gen_high_label_correct => //.
           by apply (existsHighObsLow xl).
         - by apply semReturnSize.
-Qed.          
+Qed.
 
 Lemma gen_vary_regSet_correct:
   forall regs obs,
@@ -1247,79 +1229,46 @@ Lemma gen_vary_regSet_correct:
        regs_spec regs' /\ indist obs regs regs').
 Proof.
   Opaque gen_vary_atom.
-  move => regs obs [Hlen Hspec] regs'. split.
+  move => regs obs [Hlen Hspec] regs'.
+  rewrite /regs_spec -{}Hlen; split.
   - (* Correctness *)
-    move => /semSequenceGenSize [Hlen' HIn].
-    rewrite /indist /indistList.
-    split.
-    + (* regs_spec *)
-      rewrite /regs_spec. split.
-      * by rewrite Hlen' map_length.
-      * move=> [vr' lr'] HIn'. move: (HIn') => HIn''.
-        apply in_split in HIn''. move : HIn'' => [l1 [l2 Heq]].
-        case: regs Hlen Hspec Hlen' HIn.
-        - subst regs'. move=> _ _ Hlen' _.
-          rewrite app_length /= in Hlen'. omega.
-        - move => regsf regst. set regs := regsf :: regst.
-          move=> Hlen Hspec Hlen' HIn.
-          remember (List.nth (length l1) regs regsf) as r1.
-          case: r1 Heqr1 => vr lr Heqr1.
-          have/in_zip_swap Hzip : In (vr @ lr, vr' @ lr') (seq.zip regs regs').
-          { apply in_nth_iff. exists (length l1). split.
-            rewrite -nth_seqnth seq.nth_zip.
-            rewrite Heq !nth_seqnth app_nth2 // minus_diag.
-            rewrite (nth_foralldef _ _ _ (vr @ lr)) in Heqr1.
-            by rewrite -Heqr1.
-            rewrite map_length in Hlen'. rewrite -Hlen' Heq app_length.
-            simpl. apply/ltP.
-            rewrite -[X in (_ + X)%coq_nat]addn1 [X in (X < _)%coq_nat]plus_n_O.
-            apply plus_lt_compat_l. apply/leP. rewrite addn_gt0.
-            apply/orP; by right.
-            rewrite !size_length. by rewrite map_length in Hlen'.
-            rewrite -!size_length seq.size2_zip Heq seq.size_cat.
-            rewrite -[X in X < _] addn0 ltn_add2l /= -[X in _ < X]addn1 addn_gt0.
-            by apply/orP; right.
-            rewrite map_length -!size_length in Hlen'.
-            by rewrite -seq.size_cat -Hlen' Heq. }
-          have Hind: In (vr' @ lr', (@smart_vary _ smart_vary_atom obs inf) (vr @ lr))
-                 (seq.zip regs' (map (@smart_vary  _ smart_vary_atom  obs inf) regs))
-            by apply in_map_zip.
-          simpl in Hind. apply in_zip in Hzip.
-          move : Hzip => [HIn1 /Hspec Hval] //.
-          apply (Forall2_combine _ _ _ HIn _) in Hind.
-          move/(gen_vary_atom_correct _ (vr @ lr) Hval) : Hind => [Hind Hval'].
-          rewrite /indist /indistAtom in Hind.
-          move/andP: Hind => [/andP [Hle1 Hle2] _].
-            by have -> : lr' = lr by apply/flows_antisymm.
-    + (* indist *)
-      apply forallb2_forall. split.
-      by rewrite map_length in Hlen'.
-      move=> r r' /in_zip_swap Hzip. move: (Hzip) => HIn'.
-      apply in_zip in HIn'. move: HIn' => [HIn1 HIn2].
-      apply in_map_zip with (f := (@smart_vary _ smart_vary_atom obs inf))
-        in Hzip. 
-      apply (Forall2_combine _ _ _ HIn _) in Hzip.
-      move: r r' HIn1 HIn2 Hzip => [vr lr] [vr' lr']  HIn1 /Hspec Hval.
-      by move/(gen_vary_atom_correct obs (vr @ lr) Hval) => [H _].
-  - rewrite /regs_spec /indist /indistList.
-    move => [[Hlen' Hreg] /forallb2_forall [Hlen'' Hind]]. apply semSequenceGenSize.
-    split. by rewrite map_length.
-    apply seqzip__Forall2.
-    + by rewrite map_length Hlen Hlen'.
-    + move => [[vr' lr'] gen] /in_map_zip_iff
-              [[vr lr] [Heq  HIn]] /=; subst.
-      move : (HIn) => /in_zip_swap/Hind Hind'.
-      apply in_zip in HIn. move : HIn => [HIn1 HIn2].
-      rewrite /smart_vary /smart_vary_atom.
-      move : (Hspec (vr @ lr) HIn2) => Hval.
-      apply/ (gen_vary_atom_correct obs (vr @ lr) Hval).  split => //.
-      by move : (Hreg (vr' @ lr') HIn1) => ?.
+    move => /semSequenceGenSize [_ HIn].
+    rewrite /indist /indistList; move: HIn; set regs'' := map _ _.
+    move: {1 3}regs'' (erefl regs''); rewrite {}/regs'' => regs'' e HIn.
+    elim: regs'' regs' / HIn regs Hspec e
+          => /= [|_r [rv' rl'] _regs regs' Hsem _ IH] [|[rv rl] regs] //= Hspec [??].
+    subst _r _regs.
+    have sr: val_spec rv by apply (Hspec (rv @ rl)); rewrite inE eqxx.
+    have {Hspec} srs: forall reg, reg \in regs -> atom_spec reg.
+      by move=> reg in_regs; apply Hspec; rewrite inE in_regs orbT.
+    have [[-> srs'] /andP [/eqP -> ->]] := IH regs srs erefl.
+    move: (gen_vary_atom_correct obs (rv@rl) sr)=> V.
+    move/(V (rv' @ rl')): Hsem=> [/= Hsem1 Hsem2].
+    rewrite eqxx /= andbT; split=> //; first split=> //.
+    move=> reg; rewrite inE=> /orP [/eqP -> {reg}|]; auto.
+  - rewrite /indist /indistList.
+    move => [[Hlen' Hreg] /andP [_ Hz]].
+    apply semSequenceGenSize; rewrite -!size_length size_map !size_length.
+    split=> //.
+    elim: regs regs' Hlen' Hspec Hreg Hz
+          => [|[rv rl] regs IH] [|[rv' rl'] regs'] // Hlen Hspec Hspec'.
+      by constructor.
+    set f := fun p => indist _ _ _.
+    rewrite /= => /andP [Hinds Hall]; constructor.
+      apply/(gen_vary_atom_correct obs (rv @ rl)).
+        by apply: (Hspec (rv @ rl)); rewrite inE eqxx.
+      split=> //.
+      by apply: (Hspec' (rv' @ rl')); rewrite inE eqxx.
+    apply: IH=> //.
+    + by move: Hlen=> /= [->].
+    + by move=> r in_r; apply: Hspec; rewrite inE in_r orbT.
+    by move=> r in_r; apply: Hspec'; rewrite inE in_r orbT.
 Qed.
 
 Lemma Forall2_in_right : forall {A B} (l : list A) (l' : list B) f,
-  Forall2 f l l' ->
-  forall a', In a' l' -> 
-               exists a, In a l /\ f a a'.
+  List.Forall2 f l l' ->
+  forall a', List.In a' l' ->
+               exists a, List.In a l /\ f a a'.
 move => A B l l' f Hforall.
 induction Hforall as [ | x x' l l' Hfxx Hforall IH].
 - move => ? HIn; inv HIn.
@@ -1336,19 +1285,20 @@ induction Hforall as [ | x x' l l' Hfxx Hforall IH].
     by right.
 Qed.
 
-Lemma Forall2_reg_aux : forall regs regs' reg' obs,
-  Forall2 (fun (y : G register) (x : register) => semGenSize y size x)
-          (map (gen_vary_atom obs inf) regs) regs' -> 
-  In reg' regs' ->
-  exists reg, In reg regs /\ semGenSize (gen_vary_atom obs inf reg) size reg'.
-move => regs regs' reg' obs Hforall HIn.
-pose proof (Forall2_in_right (map (gen_vary_atom obs inf) regs) regs' 
-                             (fun (y : G register) (x : register) => semGenSize y size x) 
+Lemma Forall2_reg_aux : forall regs regs' (reg' : Atom) obs,
+  List.Forall2 (fun (y : G register) (x : Atom) => semGenSize y size x)
+          (map (gen_vary_atom obs inf) regs) regs' ->
+  reg' \in regs' ->
+  exists reg, reg \in regs /\ semGenSize (gen_vary_atom obs inf reg) size reg'.
+move => regs regs' reg' obs Hforall /seq_InP HIn.
+pose proof (Forall2_in_right (map (gen_vary_atom obs inf) regs) regs'
+                             (fun (y : G Atom) (x : Atom) => semGenSize y size x)
                              Hforall reg' HIn) as H.
 move : H => [a [HIn' Hf]].
-apply in_map_iff in HIn'.
+apply List.in_map_iff in HIn'.
 move : HIn' => [reg [Hgen HIn'']]; subst.
 exists reg; split => //=.
+by apply/seq_InP.
 Qed.
 
   Opaque indist join flows gen_vary_atom.
@@ -1366,10 +1316,10 @@ split; simpl.
 + destruct (isLow pc_lab obs) eqn:Flows.
   * {
     move => /semBindSize [regs' [/semSequenceGenSize [Hlen Hforall]
-                                 /semReturnSize H2]].  
+                                 /semReturnSize H2]].
     inv H2.
     repeat split => //=.
-    - rewrite map_length in Hlen.
+    - rewrite List.map_length in Hlen.
       rewrite /regs_spec in Hregs.
       move: Hregs => [Hlen' _].
       by rewrite Hlen.
@@ -1381,7 +1331,7 @@ split; simpl.
       pose proof (Hreg reg HIn) as AtomSpec.
       rewrite /atom_spec in AtomSpec.
       destruct reg eqn:Reg.
-      pose proof (gen_vary_atom_correct obs (v @ l)).  
+      pose proof (gen_vary_atom_correct obs (v @ l)).
       simpl in H.
       apply H in AtomSpec; clear H.
       apply AtomSpec in Hsem; clear AtomSpec.
@@ -1393,36 +1343,34 @@ split; simpl.
       apply /andP; split => //=.
       apply /andP; split => //=.
       rewrite /indist /indistList.
-      apply forallb2_forall.
-      split.
-      + by rewrite map_length in Hlen.
-      + move => reg reg' HIn.
-        have H : In (reg', gen_vary_atom obs inf reg)
-                    (seq.zip regs' (map (@gen_vary_atom obs inf) regs))
-           by apply/in_map_zip/in_zip_swap.
-        apply (Forall2_combine _ _ _ Hforall _) in H.
-        simpl in H.
-        destruct reg eqn:Reg.
-        pose proof (gen_vary_atom_correct obs (v @ l)).  
-        simpl in H0.
-        rewrite /regs_spec in Hregs.
-        move : Hregs => [? Hspec].
-        apply in_zip in HIn.
-        move : HIn => [HIn ?].
-        rewrite -Reg in HIn.
-        pose proof (Hspec reg HIn) as H'.
-        rewrite /atom_spec in H'.
-        rewrite Reg in H'.
-        apply H0 in H'; clear H0.
-        apply H' in H; clear H'.
-        destruct reg'; subst.
-        by move : H => [? _].
+      rewrite !size_length Hlen -!size_length size_map eqxx /=.
+      apply/allP=> - [/= reg reg'] HIn.
+      have H : List.In (reg', gen_vary_atom obs inf reg)
+                  (seq.zip regs' (map (@gen_vary_atom obs inf) regs))
+         by apply/in_map_zip/in_zip_swap/seq_InP.
+      apply (Forall2_combine _ _ _ Hforall _) in H.
+      simpl in H.
+      destruct reg eqn:Reg.
+      pose proof (gen_vary_atom_correct obs (v @ l)).
+      simpl in H0.
+      rewrite /regs_spec in Hregs.
+      move : Hregs => [? Hspec].
+      move/seq_InP in HIn.
+      move: (in_zip regs regs' _ _ HIn) => {HIn} [/seq_InP HIn ?].
+      rewrite -Reg in HIn.
+      pose proof (Hspec reg HIn) as H'.
+      rewrite /atom_spec in H'.
+      rewrite Reg in H'.
+      apply H0 in H'; clear H0.
+      apply H' in H; clear H'.
+      destruct reg'; subst.
+      by move : H => [? _].
   }
   * {
-    move => /semBindSize [regs' [/semVectorOfSize [HLen' Hregs'] 
+    move => /semBindSize [regs' [/semVectorOfSize [HLen' Hregs']
                                  /semBindSize [pc' [Hpc'
-                                 /semBindSize [lab' [Hlab 
-                                 /semBindSize [ptr_r' [Hptr' 
+                                 /semBindSize [lab' [Hlab
+                                 /semBindSize [ptr_r' [Hptr'
                                  /semReturnSize H]]
                           ]]]]]].
     inv H.
@@ -1432,7 +1380,7 @@ split; simpl.
     repeat split => //=.
     + move => reg' HIn'.
       rewrite /set_incl in Hregs'.
-      apply Hregs' in HIn'.
+      move/seq_InP in HIn'; apply Hregs' in HIn'.
       by apply gen_atom_correct in HIn'.
     + destruct pc' eqn:PC'.
       by move : Hpc' => [_ ?].
@@ -1450,14 +1398,14 @@ split; simpl.
     apply semBindSize.
     exists regs'; split.
     - apply semSequenceGenSize; split.
-      rewrite map_length.
+      rewrite List.map_length.
       rewrite /regs_spec in Hregs.
       by move : Hregs => [-> _].
-    - { 
+    - {
       apply seqzip__Forall2.
-      + rewrite map_length.
+      + rewrite List.map_length.
         rewrite /regs_spec in Hregs.
-        move : Hregs => [-> _]. 
+        move : Hregs => [-> _].
         by apply /eqP.
       + move => [reg' g] HIn //=.
         apply in_map_zip_iff in HIn.
@@ -1470,6 +1418,7 @@ split; simpl.
         move : HIn =>  [HIn1 HIn2].
         rewrite /regs_spec in Hregs.
         move : Hregs => [Hlen Hregs].
+        move/seq_InP in HIn2.
         pose proof (Hregs (v @ l) HIn2) as Hspec.
         rewrite /atom_spec in Hspec.
         apply H in Hspec; clear H.
@@ -1480,11 +1429,11 @@ split; simpl.
           rewrite /indist /indistLowStackFrame in Hindist.
           move: Hindist => /andP [/andP [/andP [? Hindist] ?] ?].
           rewrite /indist /indistList in Hindist.
-          apply forallb2_forall in Hindist.
-          move:  Hindist => [? H].
+          move:  Hindist => /andP [? /allP H].
           apply in_zip_swap in HInZip.
+          move/seq_InP in HInZip.
           by apply H in HInZip.
-        * by apply Hregs' in HIn1.
+        * move/seq_InP in HIn1. by apply Hregs' in HIn1.
     }
     - apply semReturnSize.
       rewrite /indist /indistLowStackFrame in Hindist.
@@ -1496,7 +1445,7 @@ split; simpl.
     - apply semVectorOfSize; split => //=.
       move => reg' HIn'.
       apply gen_atom_correct.
-      by apply Hregs'.
+      by apply Hregs'; apply/seq_InP.
    apply semBindSize.
    exists (PAtm pc_addr' pc_lab'); split => //=.
    - apply gen_vary_pc_correct.
@@ -1505,17 +1454,17 @@ split; simpl.
    apply semBindSize.
    exists lab'; split => //=.
    - apply gen_label_correct => //.
-   apply semBindSize.                                
+   apply semBindSize.
    exists ptr_r'; split => //=.
    - by apply gen_from_nat_length_correct.
    by apply semReturnSize.
-Qed.   
+Qed.
 
 Lemma gen_vary_stack_correct :
   forall (st : Stack) obs,
     stack_spec st ->
-    semGenSize (gen_vary_stack obs inf st) size <--> 
-    (fun st' => indist obs st st' /\ 
+    semGenSize (gen_vary_stack obs inf st) size <-->
+    (fun st' => indist obs st st' /\
                 stack_spec st' /\
                 length (unStack st) = length (unStack st')).
 Proof.
@@ -1533,7 +1482,7 @@ Proof.
       destruct x => //=.
       do 2 split => //=.
       by left.
-    + inv Heq. 
+    + inv Heq.
       move => [H1 [H2 H3]].
       destruct st' => //=.
       rewrite /gen_vary_stack /gen_vary_low_stack.
@@ -1544,10 +1493,10 @@ Proof.
       apply semSequenceGenSize.
       split => //=.
  (* Stack Singleton *)
-  - inv Heq. split. 
-    { 
+  - inv Heq. split.
+    {
     + rewrite /gen_vary_stack /gen_vary_low_stack.
-      move => /semLiftGenSize /= [st'' [/semSequenceGenSize [Hlen Hforall] H2]]. 
+      move => /semLiftGenSize /= [st'' [/semSequenceGenSize [Hlen Hforall] H2]].
       inv H2.
       destruct st'' eqn:EqST.
       * inv Hlen.
@@ -1555,9 +1504,9 @@ Proof.
           + {
             inv Hlen.
             destruct l => //=.
-            inv Hforall.           
+            inv Hforall.
             apply gen_vary_stack_loc_correct in H3 => //=.
-            move : H3 => [? H].                                                        
+            move : H3 => [? H].
             rewrite /indist /indistStack.
             rewrite /filterStack /stackFrameBelow.
             destruct loc eqn:Loc; destruct s eqn:S;
@@ -1567,21 +1516,12 @@ Proof.
             destruct (isLow l obs) eqn:Flows.
             - { (* l <: obs *)
               simpl in H.
-              move: H => /andP [/andP [/andP [/eqP Heq1 
+              move: H => /andP [/andP [/andP [/eqP Heq1
                                             Hindist]
                                      /eqP Heq3]
                               /eqP Heq4]; subst.
               inv Heq1.
-              apply forallb2_forall; split => //=.
-              * by rewrite Flows.
-              * move => x y /= HIn.
-                rewrite Flows in HIn.
-                simpl in HIn.
-                case : HIn => [[] * | //=]; subst.
-                rewrite /indistLowStackFrame Flows => //=.
-                apply /andP; split => //=.
-                apply /andP; split => //=.
-                apply /andP; split => //=.                                        
+              by rewrite /= Flows /= Flows /= !eqxx /= !andbT.
               }
             - rewrite /negb in H.
               destruct (isLow l0 obs) eqn:Flows' => //=.
@@ -1593,7 +1533,7 @@ Proof.
             * inv Hforall.
               inv H4.
               apply gen_vary_stack_loc_correct in H2 => //=.
-              by move : H2 => [? _].        
+              by move : H2 => [? _].
         }
     }
     (* Completeness *)
@@ -1602,11 +1542,11 @@ Proof.
       rewrite /gen_vary_stack /gen_vary_low_stack.
       apply semLiftGenSize.
       destruct st' as [st'].
-      destruct st' as [ | loc' st'] => //=.              
+      destruct st' as [ | loc' st'] => //=.
       simpl in Hlen.
       inv Hlen.
       destruct st' => //=.
-      exists [loc']; split => //=.
+      exists [:: loc']; split => //=.
       apply semSequenceGenSize; split => //=.
       constructor => //=.
       apply gen_vary_stack_loc_correct => //=.
@@ -1614,22 +1554,21 @@ Proof.
       - rewrite /stack_spec in Hspec'.
         case : Hspec' => [// | [loc'' [Heq Hs]]].
         by inv Heq.
-      - destruct loc; destruct loc'; 
+      - destruct loc; destruct loc';
         destruct sf_return_addr0; destruct sf_return_addr1; simpl in Hindist.
         destruct (isLow l obs) eqn:Flows.
-        + { 
-            rewrite /indist /indistStack in Hindist.
-            apply forallb2_forall in Hindist.
-            move: Hindist => [Hlen Hindist].
+        + {
+            rewrite /indist /indistStack /= in Hindist.
+            move/andP: Hindist => [Hlen Hindist].
             rewrite /filterStack /stackFrameBelow in Hindist.
             simpl in *.
             rewrite Flows in Hindist.
             destruct (isLow l0 obs) eqn:Flows'.
-            * rewrite Flows.                                                
-              apply Hindist => //=.
-              by left.
             * rewrite Flows.
-              apply Hindist => //=.
+              rewrite /= andbT in Hindist.
+              by apply Hindist => //=.
+            * rewrite Flows.
+              rewrite /= in Hindist.
               rewrite /filterStack /stackFrameBelow in Hlen.
               simpl in Hlen.
               rewrite Flows Flows' in Hlen.
@@ -1637,8 +1576,7 @@ Proof.
           }
        + rewrite Flows.
          rewrite /indist /indistStack in Hindist.
-         apply forallb2_forall in Hindist.
-         move : Hindist => [Hlen Hindist]. 
+         move/andP: Hindist => [Hlen Hindist].
          rewrite /filterStack /stackFrameBelow in Hlen.
          simpl in *.
          destruct (isLow l0 obs) eqn:Flows' => //=.
@@ -1650,7 +1588,7 @@ Qed.
 
 Definition frame_spec (fr : frame) :=
   let 'Fr _ _ data := fr in
-      (forall a, In a data -> atom_spec a).
+      (forall a, List.In a data -> atom_spec a).
 
 Lemma gen_vary_frame_correct :
   forall obs fr,
@@ -1675,15 +1613,15 @@ Proof.
         simpl in *.
         move: (join_minimal stamp label obs Flows Flows') => Hjoin.
         rewrite Hjoin /=.
-        move => /semBindSize [data'' [/semSequenceGenSize [Hlen Hforall] 
+        move => /semBindSize [data'' [/semSequenceGenSize [Hlen Hforall]
                                       /semReturnSize [eq1 eq2 eq3]]]; subst.
-        rewrite map_length in Hlen. rewrite Flows.
+        rewrite List.map_length in Hlen. rewrite Flows.
         have Hindist_spec:
           (forall x y : Atom,
-             In (x, y) (seq.zip data data') ->
+             List.In (x, y) (seq.zip data data') ->
              indist obs x y = true /\ atom_spec y).
           { move => [v1 l1] [v2 l2] HIn. apply in_zip_swap in HIn.
-            move: (HIn) => HIn'. apply in_zip in HIn'. 
+            move: (HIn) => HIn'. apply in_zip in HIn'.
             move: HIn' => [HIn1 Hval]. apply HforallIn in Hval.
             move : (Hval) => /(gen_vary_atom_correct obs (v1 @ l1)) Hequiv.
             apply in_map_zip with (f := (@gen_vary_atom obs inf)) in HIn.
@@ -1694,71 +1632,70 @@ Proof.
             case : HIn' => [Hindist Hspec].
             by split => //.
           }
-          repeat (split => //; try apply/andP);
-            try (try apply/leP; omega); try by apply flows_refl.
+          rewrite !eqxx /=; split; last split.
           - rewrite /indist /indistList.
-            apply forallb2_forall => //. split => //.
-            by move => x y /Hindist_spec [Hind _].
+            rewrite !size_length Hlen eqxx /=.
+            by apply/allP=> - [a1 a2] /seq_InP /Hindist_spec [].
           - move => [v2 l2] HIn2.
-            move : (HIn2) => HIn2'. apply in_split in HIn2'.
+            move : (HIn2) => HIn2'. apply List.in_split in HIn2'.
             move : HIn2' => [data'_pre [data'_post Heq]].
             destruct data as [|data_hd data_tl].
-            + rewrite Heq in Hlen.  rewrite app_length /= in Hlen. omega.
+            + rewrite Heq in Hlen.  rewrite List.app_length /= in Hlen. omega.
             + remember (data_hd :: data_tl) as data. clear Heqdata.
               remember (List.nth (length data'_pre) data data_hd) as y.
               destruct y as [v1 l1].
               have/Hindist_spec [_ Hspec] :
-                In (v1 @ l1, v2 @ l2) (seq.zip data data').
+                List.In (v1 @ l1, v2 @ l2) (seq.zip data data').
               { apply in_nth_iff. exists (length data'_pre). split.
                 - rewrite -nth_seqnth seq.nth_zip //.
-                  * rewrite Heq !nth_seqnth app_nth2 // minus_diag.
+                  * rewrite Heq !nth_seqnth List.app_nth2 // minus_diag.
                     rewrite (nth_foralldef _ _ _ (v1 @ l1)) in Heqy.
                       by rewrite -Heqy.
-                  * rewrite -Hlen Heq app_length. apply/ltP.
+                  * rewrite -Hlen Heq List.app_length. apply/ltP.
                     apply NPeano.Nat.lt_add_pos_r. simpl. omega.
-                - rewrite zip_combine // combine_length Hlen NPeano.Nat.min_id.
-                  rewrite -Hlen Heq app_length. apply/ltP.
+                - rewrite zip_combine // List.combine_length Hlen NPeano.Nat.min_id.
+                  rewrite -Hlen Heq List.app_length. apply/ltP.
                   apply NPeano.Nat.lt_add_pos_r. simpl. omega. }
               assumption.
-            + rewrite Hlen. by apply leq_addr. }
+            + by rewrite Hlen leqnn /= leq_addr. }
         { (* label <: obs = false *)
           apply Bool.negb_true_iff in Flows'.
           move/(join_equiv stamp label obs Flows) : Flows' => Hjoin.
           rewrite Hjoin.
           move => /semBindSize [data'' [/semBindSize [len [/semChooseSize Hchoose
-                                                           /semVectorOfSize [Hlen Hforall]]] 
+                                                           /semVectorOfSize [Hlen Hforall]]]
                                          /semReturnSize [eq1 eq2 eq3]]]; subst.
           assert (H : Random.leq (length data) (length data).+1).
-          { 
+          {
             rewrite /Random.leq.
             simpl.
             apply/leP.
             apply le_n_Sn.
-          } 
+          }
           apply Hchoose in H; clear Hchoose; rename H into Hchoose.
           move: Hchoose => /andP [Hle3 Hle4].
           simpl in Hle3, Hle4. rewrite Flows.
-          repeat (split => //; try apply/andP); (try by rewrite addn1); 
+          repeat (split => //; try apply/andP); (try by rewrite addn1);
           try by apply flows_refl.
           by move => a /Hforall/gen_atom_correct Hin. }
     - (* stamp <: obs = false *)
         simpl in *. remember (label <: obs) as Flows''.
-        move => /semBindSize [lab [? /semBindSize [data'' 
-                                                     [/semBindSize [len [/semChooseSize H 
-                                                                         /semVectorOfSize 
+        move => /semBindSize [lab [? /semBindSize [data''
+                                                     [/semBindSize [len [/semChooseSize H
+                                                                         /semVectorOfSize
                                                                    [Hlen HforallIn']]]
                                                       /semReturnSize [eq1 eq2 eq3]
                              ]]]]; subst.
           assert (Hchoose : Random.leq (length data) (length data).+1).
-          { 
+          {
             rewrite /Random.leq.
             simpl.
             apply/leP.
             apply le_n_Sn.
-          } 
+          }
           apply H in Hchoose; clear H.
           move: Hchoose => /andP [Hle3 Hle4]. simpl in *.
-        repeat (split => //; try apply/andP); (try by rewrite addn1); 
+        repeat (split => //; try apply/andP); (try by rewrite addn1);
           try by apply flows_refl.
         by move => a /HforallIn'; apply gen_atom_correct. }
   { rewrite /indist /indistFrame /frame_spec /gen_var_frame.
@@ -1775,45 +1712,45 @@ Proof.
 (*       move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
       move: (flows_antisymm _ _ Hl3 Hl4) => Heq {Hl3 Hl4}; subst. *)
       remember (flows label' obs) as b''; destruct b''; simpl in *;
-      symmetry in Heqb''. 
+      symmetry in Heqb''.
       + (* label' <: obs = true *)
-        { 
+        {
         rewrite Heqb; simpl.
         rewrite (join_minimal _ _ _ Heqb Heqb'') /=.
         apply semBindSize.
         exists data'. split => //. apply semSequenceGenSize.
         rewrite /indist /indistList in H2.
-        move : H2 => /forallb2_forall [Hlen' HforallIn'].
+        move/andP : H2 => [/eqP Hlen' /allP HforallIn'].
         split => //.
-        * by rewrite map_length. 
+        * by rewrite List.map_length -!size_length Hlen'.
         * apply seqzip__Forall2.
-          - rewrite map_length. by rewrite Hlen'.
+          - by rewrite List.map_length -!size_length Hlen'.
           - move => [a ga] /in_map_zip_iff [[v l] [Heq HIn]].
             simpl in *.
-            move: (HIn) => /in_zip_swap/HforallIn' HInzip.
+            move: (HIn) => /in_zip_swap/seq_InP/HforallIn' HInzip.
             apply in_zip in HIn. move : HIn => [HIn1 /HforallIn Hval].
             subst.
-            apply (gen_vary_atom_correct obs (v @ l) Hval). 
+            apply (gen_vary_atom_correct obs (v @ l) Hval).
             destruct a eqn:A.
             split => //.
             apply H3 in HIn1.
             by rewrite /atom_spec in HIn1.
         * by apply semReturnSize.
-        } 
-      + { 
+        }
+      + {
         rewrite (not_flows_not_join_flows_right _ _ _ Heqb'') /=.
         rewrite Heqb; simpl.
         apply semBindSize.
-        exists data'. split => //. 
+        exists data'. split => //.
         apply semBindSize.
         exists (length data'); split.
-        * apply semChooseSize. 
+        * apply semChooseSize.
           - rewrite /Random.leq.
             simpl.
             apply/leP.
             apply le_n_Sn.
           - move : H4 => /andP [Hle1 Hle2].
-            simpl => //. apply /andP. split => //=. 
+            simpl => //. apply /andP. split => //=.
             by rewrite -addn1.
         * apply semVectorOfSize. split => //.
           move => a Hin.
@@ -1835,11 +1772,11 @@ Proof.
       exists data'. split => //=.
       + apply semBindSize.
         exists (length data'). split.
-        * apply semChooseSize. simpl. 
+        * apply semChooseSize. simpl.
           apply /leP; omega.
         * apply /andP. split => //. by rewrite -addn1.
         * apply semVectorOfSize. split => //.
-          by move => a /Hforall/gen_atom_correct HIn. 
+          by move => a /Hforall/gen_atom_correct HIn.
           by apply semReturnSize.
       }
 Qed.
@@ -1860,36 +1797,36 @@ Lemma gen_vary_frame_correct :
      length data <= length data' <= (length data) + 1).
 *)
 
-Definition mem_spec (m : memory) := 
+Definition mem_spec (m : memory) :=
   forall mf l st data,
     Mem.get_frame m mf = Some (Fr st l data) ->
     (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
-    (forall a, In a data -> atom_spec a) /\
+    (forall a, List.In a data -> atom_spec a) /\
     st = ⊥ /\ Mem.stamp mf = ⊥.
 
-Lemma handle_single_mframe_correct : 
+Lemma handle_single_mframe_correct :
   forall obs m mf fr,
     mem_spec m ->
-    Mem.get_frame m mf = Some fr -> 
+    Mem.get_frame m mf = Some fr ->
     semGenSize (handle_single_mframe obs inf m mf) size <-->
-    (fun m' => 
-       forall mf', 
-         if Mem.EqDec_block mf mf' then
+    (fun m' =>
+       forall mf',
+         if mf == mf' then
            exists fr', Mem.get_frame m' mf = Some fr' /\
                        indist obs fr fr' /\
                        (frame_spec fr') /\
                        let 'Fr _ _ data := fr in
                        let 'Fr _ _ data' := fr' in
-                       length data <= length data' <= (length data) + 1 
+                       length data <= length data' <= (length data) + 1
          else Mem.get_frame m' mf' = Mem.get_frame m mf').
-Proof. 
+Proof.
 move => obs m mf fr HmemSpec Hfr m'.
-split.                                                   
+split.
 + {
   rewrite /handle_single_mframe.
   rewrite Hfr.
   move => /semBindSize [fr' [Hfr' H]].
-  pose proof (Mem.upd_get_frame _ _ _ m mf fr fr' Hfr) as Hm'.
+  pose proof (Mem.upd_get_frame _ _ m mf fr fr' Hfr) as Hm'.
   move: Hm' => [m'' Hm''].
   rewrite Hm'' in H.
   apply semReturnSize in H.
@@ -1899,26 +1836,23 @@ split.
   move : Hfr' => [Hindist [Hspec Hlen]].
   destruct fr eqn:EqFr; destruct fr' eqn:EqFr'.
   move => mf'.
-  destruct (Mem.EqDec_block mf mf') eqn:HEqB.
+  have [e|ne] := altP (mf =P mf').
   - simpl.
     move: (e) => e'.
-    rewrite /equiv in e'.
     exists (Fr stamp0 label0 l0).
     split => //=.
     have : (Mem.upd_frame m mf (Fr stamp0 label0 l0) = Some m') by subst.
     move => Hm.
-    pose proof (Mem.get_upd_frame _ _ _ m m' mf _ Hm mf') as H.
-    rewrite /equiv_dec in H.  
-    rewrite HEqB in H.
+    pose proof (Mem.get_upd_frame _ _ m m' mf _ Hm mf') as H.
+    rewrite e eqxx in H.
     by subst.
   - simpl.
     have : (Mem.upd_frame m mf (Fr stamp0 label0 l0) = Some m') by subst.
     move => Hm.
-    pose proof (Mem.get_upd_frame _ _ _ m m' mf _ Hm mf') as H.
-    rewrite /equiv_dec in H.  
-    rewrite HEqB in H.
+    pose proof (Mem.get_upd_frame _ _ m m' mf _ Hm mf') as H.
+    rewrite (negbTE ne) in H.
     by subst.
-  rewrite /mem_spec in HmemSpec.    
+  rewrite /mem_spec in HmemSpec.
   destruct fr.
   pose proof (HmemSpec mf label stamp l Hfr) as H; clear HmemSpec.
   by move : H => [_ [? _]].
@@ -1927,10 +1861,7 @@ split.
   rewrite /handle_single_mframe Hfr.
   apply semBindSize.
   pose proof (H mf) as Hyp.
-  (* I'm not sure how to prove something this obvious *)
-  have : (Mem.EqDec_block mf mf) by admit.  
-  move => EqDec.
-  rewrite EqDec in Hyp.
+  rewrite eqxx in Hyp.
   move : Hyp => [fr' [Hget [Hindist [Hfr' Hlen]]]].
   exists fr'.
   split => //=.
@@ -1940,40 +1871,34 @@ split.
     pose proof (HmemSpec _ _ _ _ Hfr) as H'.
     by move : H' => [_ [? _]].
   - split => //=.
-    pose proof (Mem.upd_get_frame _ _ _ m mf fr fr' Hfr) as Hm'.
+    pose proof (Mem.upd_get_frame _ _ m mf fr fr' Hfr) as Hm'.
     move : Hm' => [m'' Hm''].
     rewrite Hm''.
-    
+
     have : (forall block, Mem.get_frame m' block = Mem.get_frame m'' block).
-    { 
+    {
       move => block.
-      destruct (Mem.EqDec_block mf block) eqn:EqB.
+      have := H block.
+      have [e|ne] := altP (mf =P block).
+      + subst.
+        pose proof (Mem.get_upd_frame _ _ _ _ _ _ Hm'' block) as Hyp.
+        by rewrite Hyp eqxx Hget.
       + pose proof (H block) as Hb.
-        rewrite EqB in Hb. simpl in Hb.
-        move: (e) => e'.
-        rewrite /equiv in e'.
-        subst.
-        pose proof (Mem.get_upd_frame _ _ _ _ _ _ _ Hm'' block) as Hyp.
-        rewrite /equiv_dec EqB in Hyp.
-        by rewrite Hyp Hget.
-      + pose proof (H block) as Hb.
-        rewrite EqB in Hb; simpl in Hb.
-        pose proof (Mem.get_upd_frame _ _ _ _ _ _ _ Hm'' block) as Hyp.
-        rewrite /equiv_dec EqB in Hyp.
-        by rewrite Hb Hyp.
+        pose proof (Mem.get_upd_frame _ _ _ _ _ _ Hm'' block) as Hyp.
+        by move: Hb Hyp; rewrite (negbTE ne)=> ? -> ?.
     }
     move => MemExt.
-    
+
     pose proof (Mem.memory_extensionality m' m'' MemExt).
     subst.
     by apply semReturnSize.
-Qed.    
+Qed.
 
 (*
-Lemma foldr_handle : 
+Lemma foldr_handle :
   forall obs m mf fr m',
     mem_spec m ->
-    Mem.get_frame m mf = Some fr -> 
+    Mem.get_frame m mf = Some fr ->
     seq.foldr (fun (b : mframe) (p : memory -> Prop) (m0 : memory) =>
                  exists (m' : memory),
                    (semGenSize (handle_single_mframe obs inf m0 b) size :&: p) m')
@@ -1983,30 +1908,30 @@ Proof.
 move => obs m mf fr m' Hspec Hget Hfoldr.
 induction (Mem.get_blocks elems m).
 
-seq.foldr (fun 
+seq.foldr (fun
 
 *)
 (*
-Lemma foldGenHandle_correct : 
-  forall obs m l, 
-  mem_spec m -> 
+Lemma foldGenHandle_correct :
+  forall obs m l,
+  mem_spec m ->
   (forall b, In b l -> exists fr, Mem.get_frame m b = Some fr) ->
-  semGenSize (foldGen (handle_single_mframe obs inf) l m) size <--> 
-  (fun m' => forall b, 
-               (if in_dec Mem.EqDec_block b l then 
+  semGenSize (foldGen (handle_single_mframe obs inf) l m) size <-->
+  (fun m' => forall b,
+               (if in_dec Mem.EqDec_block b l then
                   exists fr , Mem.get_frame m b = Some fr /\
                   exists fr', Mem.get_frame m' b = Some fr' /\
                              indist obs fr fr' /\
                              (frame_spec fr') /\
                              let 'Fr _ _ data := fr in
                              let 'Fr _ _ data' := fr' in
-                             length data <= length data' <= (length data) + 1 
+                             length data <= length data' <= (length data) + 1
                else Mem.get_frame m' b = Mem.get_frame m b) /\
                mem_spec m').
-Proof. 
+Proof.
 move => obs m l Hspec Hget m'.
 split.
-+ { 
++ {
   move : m m' Hget Hspec.
   induction l as [|x l IHl].
   - move => m m' Hget Hspec /semFoldGen_right Hsem b.
@@ -2021,7 +1946,7 @@ split.
       split.
       * exists fr; split => //=.
         move : H => [/handle_single_mframe_correct Hx Hfold].
-        
+
   exists fr'
     (fun fr' => indist obs fr fr' /\
      (frame_spec fr') /\
@@ -2033,16 +1958,16 @@ split.
 Lemma gen_vary_memory_correct:
   forall (obs: Label) (m : memory),
     (mem_spec m) ->
-    semGenSize (gen_vary_memory obs inf m) size <--> 
+    semGenSize (gen_vary_memory obs inf m) size <-->
     (fun m' => indist obs m m' /\ mem_spec m').
-Proof. 
+Proof.
 move => obs m Hspec m'.
 rewrite /indist /indistMem /blocks_stamped_below /allThingsBelow.
 split.
 - {
     rewrite /gen_vary_memory.
     move => /semFoldGen_right H.
-    
+
 
     apply semFoldGen_right.
 Qed.

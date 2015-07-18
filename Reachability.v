@@ -1,9 +1,10 @@
-Require Import List. Import ListNotations.
 Require Import ZArith.
 
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
 Require Import TestingCommon.
+
+Import LabelEqType.
 
 Definition is_low_pointer (obs : Label) (a : Atom) : bool :=
   match a with
@@ -19,27 +20,24 @@ Definition extract_mframe (a : Atom) : option mframe :=
 
 Definition elem {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
            (x : A) (l : list A) : bool :=
-  existsb (fun y => if eq_dec x y then true else false) l.
+  has (fun y => if eq_dec x y then true else false) l.
 
 (* This unions two sets while removing duplicates *)
-Fixpoint nub_by_aux {A : Type} (eq_dec : forall (x y : A), {x = y} + {x <> y})
-         (l acc : list A) : list A :=
+Fixpoint nub_by_aux (A : eqType) (l acc : list A) : list A :=
   match l with
-    | [] => acc
+    | [::] => acc
     | h::t =>
-      if elem eq_dec h acc
-      then nub_by_aux eq_dec t acc
-      else nub_by_aux eq_dec t (h::acc)
+      if h \in acc
+      then nub_by_aux A t acc
+      else nub_by_aux A t (h::acc)
   end.
 
 (* This removes duplicates from a list *)
-Definition nub_by {A : Type} eq_dec (l : list A) := nub_by_aux eq_dec l [].
+Definition nub_by {A : eqType} (l : list A) := nub_by_aux A l [::].
 
 Definition get_mframes_from_atoms (obs : Label) (atoms : list Atom)
   : list mframe :=
-  nub_by Mem.EqDec_block
-        (list_of_option (map extract_mframe
-                        (filter (is_low_pointer obs) atoms))).
+  nub_by (pmap extract_mframe (filter (is_low_pointer obs) atoms)).
 
 Fixpoint get_root_set_stack (obs : Label)
          (acc : list mframe) (s : list StackFrame) : list mframe :=
@@ -48,8 +46,8 @@ Fixpoint get_root_set_stack (obs : Label)
     | (SF pc rs _ _) :: s' =>
       let new_mframes :=
           if isLow ∂pc obs then get_mframes_from_atoms obs rs
-          else [] in
-      let acc' := nub_by_aux Mem.EqDec_block new_mframes acc in
+          else [::] in
+      let acc' := nub_by_aux _ new_mframes acc in
       get_root_set_stack obs acc' s'
   end.
 
@@ -57,7 +55,7 @@ Definition get_root_set (obs : Label) (st : State) : list mframe :=
   let '(St _ _ s r pc) := st in
   let init_root_set :=
       if isLow ∂pc obs then get_mframes_from_atoms obs r
-      else [] in
+      else [::] in
   get_root_set_stack obs init_root_set (unStack s).
 
 Function reachable_from_root_set (obs : Label) (st : State)
@@ -67,9 +65,9 @@ Function reachable_from_root_set (obs : Label) (st : State)
          length (all frames / (visited / workist)), or something like that *)
   : list mframe :=
   match worklist with
-    | [] => visited
+    | [::] => visited
     | h::t =>
-      if elem Mem.EqDec_block h visited then
+      if h \in visited then
         reachable_from_root_set obs st visited t
       else
         match Mem.get_frame (st_mem st) h with
@@ -77,8 +75,8 @@ Function reachable_from_root_set (obs : Label) (st : State)
             let newCands :=
                 if isLow l obs then
                   get_mframes_from_atoms obs atoms
-                else [] in
-            let worklist' := nub_by_aux Mem.EqDec_block newCands t in
+                else [::] in
+            let worklist' := nub_by_aux _ newCands t in
             reachable_from_root_set obs st (h :: visited) worklist'
           | _ => reachable_from_root_set obs st (h :: visited) t
         end
@@ -88,19 +86,19 @@ Admitted.
 
 Definition reachable (obs : Label) (st : State) : list mframe :=
   let root_set := get_root_set obs st in
-  reachable_from_root_set obs st [] root_set.
+  reachable_from_root_set obs st [::] root_set.
 
 Definition well_formed_label (st : State) (l : Label) : bool :=
   let observable := reachable l st in
-  forallb (fun mf => let s := Mem.stamp mf in isLow s l) observable.
+  all (fun mf => let s := Mem.stamp mf in isLow s l) observable.
 
 (* Given a state and a stamp configuration, make sure everything is ok *)
 (* LL: This also suggests a way of generating stamps! Namely, get
    the meet of all the labels where a frame is reachable *)
 Definition well_formed (st : State) : bool :=
-  forallb (well_formed_label st) elems.
+  all (well_formed_label st) elems.
 
 (* Computes the meet of a list of labels. Must be provided with top as the
    initial accumulator *)
 Definition list_meet (acc : Label) (ls : list Label) :=
-  fold_left meet ls acc.
+  foldl meet acc ls.

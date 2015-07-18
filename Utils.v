@@ -1210,20 +1210,6 @@ Fixpoint concat {A : Type} (l : list (list A)) : (list A) :=
     | (h :: t) => h ++ concat t
   end.
 
-Fixpoint forallb2 {A : Type} (f : A -> A -> bool) (l1 l2 :list A) : bool :=
-  match l1, l2 with
-    | nil, nil => true
-    | h1::t1, h2::t2 => f h1 h2 && forallb2 f t1 t2
-    | _, _ => false
-  end%bool.
-
-Fixpoint list_of_option {A : Type} (l : list (option A)) : list A :=
-  match l with
-    | nil => nil
-    | Some h :: t => h :: list_of_option t
-    | None :: t => list_of_option t
-  end.
-
 Fixpoint optOfList {A : Type} (l : list (option A)) (acc : list A)
 : option (list A) :=
   match l with

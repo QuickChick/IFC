@@ -132,21 +132,6 @@ Proof.
     apply Bool.negb_true_iff. eassumption .
 Qed.
 
-Lemma forallb2_forall :
-  forall (A : Type) (f : A -> A -> bool) (l1 l2 : list A),
-    forallb2 f l1 l2 = true <->
-    (length l1 = length l2 /\
-     forall x y : A, In (x, y) (seq.zip l1 l2) -> f x y = true).
-Proof.
-  move=> A f l1 l2. split.
-  + elim: l1 l2 => [| x l1 IHxs]; case => //= y l2 /andP [H1 H2].
-    move/(_ l2 H2) : IHxs => [-> HIn]. split => //.
-    move=> x' y' [[Heq1 Heq2] | HIn']; subst; by auto.
-  + elim: l1 l2 => [| x l1 IHxs]; case => [|y l2] //=; try by move => [H _].
-    move => [Hlen HIn]. apply/andP; split. by eauto.
-    apply IHxs. split; by eauto.
-Qed.
-
 Lemma zip_combine:
   forall {A} {B} (l1 : list A) (l2 : list B),
     length l1 = length l2 ->

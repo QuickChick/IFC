@@ -1,6 +1,4 @@
 Require Import ZArith.
-Require Import List.
-Require Import EquivDec.
 
 Require Import Utils. Import DoNotation.
 Require Import Labels.
@@ -8,7 +6,7 @@ Require Import Rules.
 Require Import Memory.
 Require Import Instructions.
 
-Require ssreflect ssrbool eqtype.
+Require Import ssreflect ssrbool eqtype seq.
 
 Import LabelEqType.
 
@@ -77,7 +75,7 @@ Notation isLow l obs := (flows l obs).
 Notation isHigh l obs := (negb (isLow l obs)).
 
 (** memory frame pointers. *)
-Definition mframe : Type := Mem.block Label.
+Notation mframe := (Mem.block Label).
 
 (* values *)
 Inductive Pointer : Type :=
@@ -88,10 +86,51 @@ Inductive Value : Type :=
   | Vptr  (p:Pointer)
   | Vlab  (l:Label).
 
+Definition val_eq (v1 v2 : Value) : bool :=
+  match v1, v2 with
+    | Vint  i1, Vint i2  => i1 == i2
+    | Vlab  l1, Vlab l2  => l1 == l2
+    | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
+      (mf1 == mf2) && (i1 == i2)
+    | _, _ => false
+  end.
+
+Lemma val_eqP : Equality.axiom val_eq.
+Proof.
+move=> v1 v2; apply/(iffP idP).
+case: v1 => v1; case: v2 => v2 //=.
++ by move/eqP ->.
++ by case: v1.
++ case: v1 => fp1 i1; case: v2 => fp2 i2.
+  by case/andP=> [/eqP -> /eqP ->].
++ by case: v1.
++ by move/eqP->.
++ move->; rewrite /val_eq.
+  case: v2 => // [[fp2 i2]].
+  by apply/andP; split=> //.
+Qed.
+
+Definition val_eqMixin := EqMixin val_eqP.
+Canonical val_eqType := EqType _ val_eqMixin.
+
 Inductive Atom : Type :=
  | Atm (v:Value) (l:Label).
 
 Infix "@" := Atm (no associativity, at level 50).
+
+Definition eqAtom (a1 a2 : Atom) :=
+  match a1, a2 with
+  | v1@l1, v2@l2 => (v1 == v2) && (l1 == l2)
+  end.
+
+Lemma eqAtomP : Equality.axiom eqAtom.
+Proof.
+move=> [xv xl] [yv yl] /=.
+by apply/(iffP andP)=> [[/eqP -> /eqP ->]|[-> ->]].
+Qed.
+
+Canonical Atom_eqMixin := EqMixin eqAtomP.
+Canonical Atom_eqType := Eval hnf in EqType Atom Atom_eqMixin.
 
 Inductive Ptr_atom : Type :=
  | PAtm (i:Z) (l:Label).
@@ -124,7 +163,7 @@ Definition imem := list (@Instr Label).
 Definition instr_lookup (m:imem) (pc:Ptr_atom) : option (@Instr Label) :=
   let '(PAtm i _) := pc in
   nth_error_Z m i.
-Notation "m [ pc ]" := (instr_lookup m pc) (at level 20).
+Notation "m `[ pc ]" := (instr_lookup m pc) (at level 20).
 
 Definition add_pc (pc:Ptr_atom) (n:Z) : Ptr_atom :=
   let '(PAtm i l) := pc in
@@ -174,34 +213,8 @@ Global Instance JoinPtrAtom : Join Ptr_atom := { join_label := ptr_atom_join }.
 Ltac try_split_congruence :=
   try solve [left; congruence | right; congruence].
 
-Definition mframe_eq (m1 m2 : mframe) : bool :=
-  if Mem.EqDec_block m1 m2 then true else false.
-
-Definition val_eq (v1 v2 : Value) : bool :=
-  match v1, v2 with
-    | Vint  i1, Vint i2  => eqtype.eq_op i1 i2
-    | Vlab  l1, Vlab l2  => eqtype.eq_op l1 l2
-    | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
-      (mframe_eq mf1 mf2 && eqtype.eq_op i1 i2)%bool
-    | _, _ => false
-  end.
-
 Definition val_eq_val (v1 v2 : Value) : Value :=
   Vint (if val_eq v1 v2 then 1 else 0)%Z.
-
-(* CH: TODO: we should get rid of this crap! *)
-(* Proof-stuff previously in Memory.v *)
-Global Instance EqDec_block : EqDec Value eq.
-Proof.
-  intros x y;
-  unfold complement, equiv; simpl;
-  destruct x; destruct y; try_split_congruence.
-  - destruct (Z.eq_dec n n0); subst; auto; try_split_congruence.
-  - destruct p; destruct p0;
-    destruct (Z.eq_dec i i0); destruct (equiv_dec fp fp0);
-    try_split_congruence.
-  - destruct (LatEqDec Label l l0); try_split_congruence.
-Qed.
 
 Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
   match b, v1, v2 with
@@ -261,7 +274,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
     alloc size stamp label a m = Some (mf, m') ->
     forall mf' ofs',
       load m' (Ptr mf' ofs') =
-        if equiv_dec mf mf' then
+        if mf == mf' then
           if Z_le_dec 0 ofs' then
             if Z_lt_dec ofs' size then Some a else None
           else None
@@ -269,37 +282,34 @@ Lemma load_alloc : forall size stamp label a m m' mf,
 Proof.
   unfold alloc, load; intros.
   destruct (zreplicate size a) eqn:Ez; try congruence; inv H.
-  rewrite (Mem.alloc_get_frame _ _ _ _ _ _ _ _ _ H1).
-  destruct (equiv_dec mf); simpl in *.
-  - inv e.
-    destruct (equiv_dec mf' mf'); try congruence.
-    simpl.
-    eapply nth_error_Z_zreplicate; eauto.
-  - destruct (equiv_dec mf); simpl in *; try congruence.
+  rewrite (Mem.alloc_get_frame _ _ _ _ _ _ _ _ H1).
+  case: (mf =P mf')=> ? //=; simpl in *.
+  subst.
+  simpl.
+  eapply nth_error_Z_zreplicate; eauto.
 Qed.
 
 Lemma load_store : forall {m m'} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
     forall b' ofs',
       load m' (Ptr b' ofs') =
-      if equiv_dec b b' then
-        if Z_eq_dec ofs ofs' then Some a else load m (Ptr b' ofs')
+      if b == b' then
+        if ofs == ofs' then Some a else load m (Ptr b' ofs')
       else load m (Ptr b' ofs').
 Proof.
   unfold store, load; intros.
   destruct (Mem.get_frame m b) eqn:E1; try congruence.
   destruct f as [stmp lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
-  rewrite (Mem.get_upd_frame _ _ _ _ _ _ _ H).
-  destruct (equiv_dec b); simpl in *;
-  destruct (equiv_dec b); simpl in *; try congruence.
-  - inv e; clear e0.
-    destruct Z.eq_dec; simpl in *.
-    + inv e.
-      eapply update_list_Z_spec; eauto.
-    + rewrite E1.
-      symmetry.
-      eapply update_list_Z_spec2; eauto.
+  rewrite (Mem.get_upd_frame _ _ _ _ _ _ H).
+  have [e|neb //] := (b =P b'); simpl in *.
+  subst b'.
+  have [?|?] := eqP.
+  + subst ofs'.
+    eapply update_list_Z_spec; eauto.
+  + rewrite E1.
+    symmetry.
+    eapply update_list_Z_spec2; eauto.
 Qed.
 
 Lemma load_store_old : forall {m m':memory} {b ofs a},
@@ -310,19 +320,15 @@ Lemma load_store_old : forall {m m':memory} {b ofs a},
 Proof.
   intros.
   rewrite (load_store H).
-  destruct (@equiv_dec mframe); simpl in *; try congruence.
-  destruct Z.eq_dec; simpl in *; try congruence.
+  have [?|//] := (b =P b'); subst b'.
+  have [?|//] := (ofs =P _); subst ofs'.
+  congruence.
 Qed.
 
 Lemma load_store_new : forall {m m':memory} {b ofs a},
     store m (Ptr b ofs) a = Some m' ->
     load m' (Ptr b ofs) = Some a.
-Proof.
-  intros.
-  rewrite (load_store H).
-  destruct (@equiv_dec mframe); simpl in *; try congruence.
-  destruct Z.eq_dec; simpl in *; try congruence.
-Qed.
+Proof. by move=> ????? H; rewrite (load_store H) !eqxx.  Qed.
 
 Lemma load_some_store_some : forall {m:memory} {b ofs a},
     load m (Ptr b ofs) = Some a ->
@@ -337,55 +343,6 @@ Proof.
   destruct (@update_list_Z_Some _ a' l ofs); auto.
   rewrite H2.
   eapply Mem.upd_get_frame; eauto.
-Qed.
-
-Lemma alloc_get_frame_old :
-  forall T S {eqS : EqDec S eq} mode mem (stamp : S) (f f' : @Memory.frame T S) b b' mem'
-         (ALLOC : Mem.alloc mode mem stamp f' = (b', mem'))
-         (FRAME : Mem.get_frame mem b = Some f),
-    Mem.get_frame mem' b = Some f.
-Proof.
-  intros.
-  erewrite Mem.alloc_get_frame; eauto.
-  destruct (equiv_dec b' b) as [E | E]; simpl in *; auto.
-  compute in E. subst b'.
-  exploit Mem.alloc_get_fresh; eauto.
-  congruence.
-Qed.
-
-Lemma alloc_get_frame_new :
-  forall T S {eqS : EqDec S eq} mode mem (stamp : S) (frame : @Memory.frame T S) b mem'
-         (ALLOC : Mem.alloc mode mem stamp frame = (b, mem')),
-    Mem.get_frame mem' b = Some frame.
-Proof.
-  intros.
-  erewrite Mem.alloc_get_frame; eauto.
-  destruct (equiv_dec b b) as [E | E]; simpl in *; auto.
-  congruence.
-Qed.
-
-Lemma get_frame_upd_frame_eq :
-  forall T S {eqS : EqDec S eq}
-         (m : Mem.t T S) b f m'
-         (UPD : Mem.upd_frame m b f = Some m'),
-    Mem.get_frame m' b = Some f.
-Proof.
-  intros.
-  erewrite Mem.get_upd_frame; eauto.
-  destruct (equiv_dec b b); eauto.
-  congruence.
-Qed.
-
-Lemma get_frame_upd_frame_neq :
-  forall T S {eqS : EqDec S eq}
-         (m : Mem.t T S) b b' f m'
-         (UPD : Mem.upd_frame m b f = Some m')
-         (NEQ : b' <> b),
-    Mem.get_frame m' b' = Mem.get_frame m b'.
-Proof.
-  intros.
-  erewrite Mem.get_upd_frame; eauto.
-  destruct (equiv_dec b b'); simpl in *; congruence.
 Qed.
 
 Lemma get_frame_store_neq :
@@ -409,7 +366,7 @@ Lemma alloc_get_frame_eq :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (equiv_dec b b); simpl in *; congruence.
+  by rewrite eqxx.
 Qed.
 
 Lemma alloc_get_frame_neq :
@@ -420,7 +377,7 @@ Lemma alloc_get_frame_neq :
 Proof.
   intros.
   erewrite Mem.alloc_get_frame; eauto.
-  destruct (equiv_dec b b'); simpl in *; congruence.
+  have [?|?] := (b =P b'); simpl in *; congruence.
 Qed.
 
 Definition extends (m1 m2 : memory) : Prop :=
@@ -476,7 +433,7 @@ Close Scope form_scope.
 Inductive step (t : table) : State -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Lab r1 r2))
+     (CODE: im`[pc] = Some (Lab r1 r2))
      (REG1: registerContent r r1 = Some (v @ K))
      (TMU: run_tmr t OpLab <||> LPC = Some (Some rl, rpcl))
      (UPD: registerUpdate r r2 (Vlab K @ rl) = Some r'),
@@ -485,7 +442,7 @@ Inductive step (t : table) : State -> State -> Prop :=
           (St im μ σ r' (PAtm (j+1) rpcl))
  | step_pclab: forall im μ σ pc r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (PcLab r1))
+     (CODE: im`[pc] = Some (PcLab r1))
      (TMU: run_tmr t OpPcLab <||> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r1 (Vlab (∂ pc) @ rl) = Some r'),
      step t
@@ -493,7 +450,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_mlab: forall im μ σ pc r r1 r2 p K C j LPC rl r' rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (MLab r1 r2))
+     (CODE: im`[pc] = Some (MLab r1 r2))
      (OLD : mlab μ p = Some C)
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
      (TMU : run_tmr t OpMLab <|K; C|> LPC = Some (Some rl, rpcl))
@@ -503,7 +460,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (Zsucc j) rpcl))
  | step_putlab: forall im μ σ pc r r' r1 j LPC rl rpcl l
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (PutLab l r1))
+     (CODE: im`[pc] = Some (PutLab l r1))
      (TMU : run_tmr t OpPutLab <||> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r1 (Vlab l @ rl) = Some r'),
      step t
@@ -511,7 +468,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_bcall: forall im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl
      (PC: pc = PAtm j Lpc)
-     (CODE: im[pc] = Some (BCall r1 r2 r3))
+     (CODE: im`[pc] = Some (BCall r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vint addr @ La))
      (OP2 : registerContent r r2 = Some (Vlab B @ K))
      (TMU : run_tmr t OpBCall <|La; K|> Lpc = Some (Some rl, rpcl)),
@@ -521,7 +478,7 @@ Inductive step (t : table) : State -> State -> Prop :=
  | step_bret: forall im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl
      (PC: pc  = PAtm j  LPC)
      (PC': pc' = PAtm j' LPC')
-     (CODE: im[pc] = Some BRet)
+     (CODE: im`[pc] = Some BRet)
      (STAYS : registerContent r r1 = Some (a @ R))
      (TMU : run_tmr t OpBRet <|R; B; LPC'|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r' r1 (a @ rl) = Some r''),
@@ -530,7 +487,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r'' (PAtm j' rpcl))
  | step_alloc: forall im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Alloc r1 r2 r3))
+     (CODE: im`[pc] = Some (Alloc r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vint i @ K))
      (OP2 : registerContent r r2 = Some (Vlab Ll @ K'))
      (TMU : run_tmr t OpAlloc <|K; K'; Ll|> LPC = Some (Some rl, rpcl))
@@ -543,7 +500,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ' σ r' (PAtm (j+1) rpcl))
  | step_load: forall im μ σ pc C p K r r' r1 r2 j LPC v Ll rl rpcl
      (PC  : pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Load r1 r2))
+     (CODE: im`[pc] = Some (Load r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
      (READ: load μ p = Some (v @ Ll))
      (MLAB: mlab μ p = Some C)
@@ -554,7 +511,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_store: forall im μ σ pc v p μ' r r1 r2 j LPC rpcl rl lp lf lv
      (PC  : pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Store r1 r2))
+     (CODE: im`[pc] = Some (Store r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ lp))
      (OP2 : registerContent r r2 = Some (v @ lv))
      (MLAB: mlab μ p = Some lf)
@@ -565,7 +522,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ' σ r (PAtm (j+1) rpcl))
  | step_write: forall im μ σ pc v p μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf
      (PC  : pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Store r1 r2))
+     (CODE: im`[pc] = Some (Store r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ lp))
      (OP2 : registerContent r r2 = Some (v @ lv))
      (READ: load μ p = Some (v' @ lv'))
@@ -577,7 +534,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ' σ r (PAtm (j+1) rpcl))
  | step_jump: forall im μ σ pc addr Ll r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Jump r1))
+     (CODE: im`[pc] = Some (Jump r1))
      (OP1 : registerContent r r1 = Some (Vint addr @ Ll))
      (TMU: run_tmr t OpJump <|Ll|> LPC = Some (None, rpcl)),
      step t
@@ -585,7 +542,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r (PAtm addr rpcl))
  | step_bnz_yes: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (BNZ n r1))
+     (CODE: im`[pc] = Some (BNZ n r1))
      (OP1 : registerContent r r1 = Some (Vint m @ K))
      (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
      (TEST: m <> 0),
@@ -594,7 +551,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r (PAtm (j + n) rpcl))
  | step_bnz_no: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (BNZ n r1))
+     (CODE: im`[pc] = Some (BNZ n r1))
      (OP1 : registerContent r r1 = Some (Vint m @ K))
      (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
      (TEST: m = 0),
@@ -603,7 +560,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r (PAtm (j + 1) rpcl))
  | step_psetoff: forall im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (PSetOff r1 r2 r3))
+     (CODE: im`[pc] = Some (PSetOff r1 r2 r3))
      (OP1 : registerContent r r1 = Some (Vptr (Ptr fp' j') @ K1))
      (OP2 : registerContent r r2 = Some (Vint n @ K2))
      (TMU: run_tmr t OpPSetOff <|K1; K2|> LPC = Some (Some rl, rpcl))
@@ -613,7 +570,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j + 1) rpcl))
  | step_put: forall im μ σ pc x r r' r1 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Put x r1))
+     (CODE: im`[pc] = Some (Put x r1))
      (TMU : run_tmr t OpPut <||> LPC = Some (Some rl, rpcl))
      (OP1 : registerUpdate r r1 (Vint x @ rl) = Some r'),
      step t
@@ -621,7 +578,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_binop: forall im μ σ pc o v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (BinOp o r1 r2 r3))
+     (CODE: im`[pc] = Some (BinOp o r1 r2 r3))
      (OP1 : registerContent r r1 = Some (v1 @ L1))
      (OP2 : registerContent r r2 = Some (v2 @ L2))
      (TMU : run_tmr t OpBinOp <|L1; L2|> LPC = Some (Some rl, rpcl))
@@ -632,14 +589,14 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_nop: forall im μ σ pc r j LPC rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some Nop)
+     (CODE: im`[pc] = Some Nop)
      (TMU : run_tmr t OpNop <||> LPC = Some (None, rpcl)),
      step t
        (St im μ σ r pc)
        (St im μ σ r (PAtm (j+1) rpcl))
  | step_msize: forall im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (MSize r1 r2))
+     (CODE: im`[pc] = Some (MSize r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ K))
      (MLAB: mlab μ p = Some C)
      (TMU: run_tmr t OpMSize <|K; C|> LPC = Some (Some rl, rpcl))
@@ -650,7 +607,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_pgetoff: forall im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (PGetOff r1 r2))
+     (CODE: im`[pc] = Some (PGetOff r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr (Ptr fp' j') @ K))
      (TMU: run_tmr t OpPGetOff <|K|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r r2 (Vint j' @ rl) = Some r'),
@@ -659,7 +616,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ σ r' (PAtm (j+1) rpcl))
  | step_mov: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
-     (CODE: im[pc] = Some (Mov r1 r2))
+     (CODE: im`[pc] = Some (Mov r1 r2))
      (REG1: registerContent r r1 = Some (v @ K))
      (TMU: run_tmr t OpMov <|K|> LPC = Some (Some rl, rpcl))
      (UPD: registerUpdate r r2 (v @ rl) = Some r'),
@@ -670,7 +627,7 @@ Inductive step (t : table) : State -> State -> Prop :=
 (** * Executable semantics *)
 
 Definition state_instr_lookup (st:State) : option (@Instr Label) :=
-  (st_imem st)[st_pc st].
+  (st_imem st)`[st_pc st].
 
 Definition fstep t (st:State) : option State :=
   do instr <- state_instr_lookup st;
@@ -982,26 +939,5 @@ Qed.
 
 Definition pc_eqMixin := EqMixin pc_eqP.
 Canonical pc_eqType := EqType _ pc_eqMixin.
-
-Lemma val_eqP : Equality.axiom val_eq.
-Proof.
-move=> v1 v2; apply/(iffP idP).
-case: v1 => v1; case: v2 => v2 //=.
-+ by move/eqP ->.
-+ by case: v1.
-+ case: v1 => fp1 i1; case: v2 => fp2 i2.
-  case/andP; rewrite /mframe_eq.
-  by case: (Mem.EqDec_block fp1 fp2)=> // -> _ /eqP ->.
-+ by case: v1.
-+ by move/eqP->.
-+ move->; rewrite /val_eq.
-  case: v2 => // [[fp2 i2]].
-  apply/andP; split=> //.
-  rewrite /mframe_eq.
-  by case: (Mem.EqDec_block fp2 fp2)=> // [[]].
-Qed.
-
-Definition val_eqMixin := EqMixin val_eqP.
-Canonical val_eqType := EqType _ val_eqMixin.
 
 End MachineM.
