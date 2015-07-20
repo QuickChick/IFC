@@ -483,8 +483,8 @@ Inductive step (t : table) : State -> State -> Prop :=
      (TMU : run_tmr t OpBRet <|R; B; LPC'|> LPC = Some (Some rl, rpcl))
      (RES : registerUpdate r' r1 (a @ rl) = Some r''),
      step t
-       (St im μ (ST (SF pc' r' r1 B :: (unStack σ))) r pc)
-       (St im μ σ r'' (PAtm j' rpcl))
+       (St im μ (ST (SF pc' r' r1 B :: σ)) r pc)
+       (St im μ (ST σ) r'' (PAtm j' rpcl))
  | step_alloc: forall im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp
      (PC: pc = PAtm j LPC)
      (CODE: im`[pc] = Some (Alloc r1 r2 r3))
@@ -522,7 +522,7 @@ Inductive step (t : table) : State -> State -> Prop :=
        (St im μ' σ r (PAtm (j+1) rpcl))
  | step_write: forall im μ σ pc v p μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf
      (PC  : pc = PAtm j LPC)
-     (CODE: im`[pc] = Some (Store r1 r2))
+     (CODE: im`[pc] = Some (Write r1 r2))
      (OP1 : registerContent r r1 = Some (Vptr p @ lp))
      (OP2 : registerContent r r2 = Some (v @ lv))
      (READ: load μ p = Some (v' @ lv'))
@@ -540,24 +540,14 @@ Inductive step (t : table) : State -> State -> Prop :=
      step t
        (St im μ σ r pc)
        (St im μ σ r (PAtm addr rpcl))
- | step_bnz_yes: forall im μ σ pc n m K r r1 j LPC rpcl
+ | step_bnz: forall im μ σ pc n m K r r1 j LPC rpcl
      (PC: pc = PAtm j LPC)
      (CODE: im`[pc] = Some (BNZ n r1))
      (OP1 : registerContent r r1 = Some (Vint m @ K))
-     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
-     (TEST: m <> 0),
+     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl)),
      step t
        (St im μ σ r pc)
-       (St im μ σ r (PAtm (j + n) rpcl))
- | step_bnz_no: forall im μ σ pc n m K r r1 j LPC rpcl
-     (PC: pc = PAtm j LPC)
-     (CODE: im`[pc] = Some (BNZ n r1))
-     (OP1 : registerContent r r1 = Some (Vint m @ K))
-     (TMU: run_tmr t OpBNZ <|K|> LPC = Some (None, rpcl))
-     (TEST: m = 0),
-     step t
-       (St im μ σ r pc)
-       (St im μ σ r (PAtm (j + 1) rpcl))
+       (St im μ σ r (PAtm (if m == 0 then j + 1 else j + n) rpcl))
  | step_psetoff: forall im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl
      (PC: pc = PAtm j LPC)
      (CODE: im`[pc] = Some (PSetOff r1 r2 r3))
@@ -683,8 +673,8 @@ Definition fstep t (st:State) : option State :=
         | _, _ => None
       end
     | BRet =>
-      match unStack σ with
-        | SF (PAtm jp' LPC') savedRegs r1 B :: σ' =>
+      match σ with
+        | ST (SF (PAtm jp' LPC') savedRegs r1 B :: σ') =>
           do r1Cont <- registerContent r r1;
           let '(a @ R) := r1Cont in
           match run_tmr t OpBRet <|R; B; LPC'|> LPC with
@@ -767,7 +757,7 @@ Definition fstep t (st:State) : option State :=
         | Some (Vint m @ K) =>
           match run_tmr t OpBNZ <|K|> LPC with
             | Some (None, rpcl) =>
-              let new_pc := (if Z_eq_dec m 0 then j+1 else j+n) in
+              let new_pc := (if m == 0 then j+1 else j+n) in
                 Some (St im μ σ r (PAtm new_pc rpcl))
             | _ => None
           end
@@ -847,75 +837,40 @@ Definition fstep t (st:State) : option State :=
     | Halt => None
   end.
 
-Lemma fstepP t st st' : fstep t st = Some st' <-> step t st st'.
-Proof.
-admit.
-Qed.
-
-
-Ltac fstep_solver :=
-  repeat (simpl; match goal with
-            | |- context[registerContent ?rs ?reg] =>
-              remember (registerContent rs reg) as Hyp; destruct Hyp
-            | |- context[do _ <- Some ?x; _] =>
-              case_eq x; [simpl; intro; intro|simpl; congruence]
-            | |- context[do _ <- ?x; _] =>
-              case_eq x; [simpl; intro; intro|simpl; congruence]
-            | |- context[match ?s with | (_,_) => _ end] =>
-              case_eq s; intro; intro; intro
-            | |- context[match ?s with | _ => _ end] =>
-              destruct s
-            | |- context[match ?s with | Some _ => _ | None => _ end] =>
-              destruct s
-(*            | |- context[Atm (Vptr (Ptr ?fp ?i)) ?l] =>
-              replace (Vptr (Ptr fp i) @ l)
-              with (ptr_atom_to_atom (PAtm i l)) by auto
-*)
-            | |- Some _ = None -> _ => intros contra; inversion contra
-            | |- None = Some _ -> _ => intros contra; inversion contra
-          end); try congruence;
-  try match goal with
-    | |- Some _ = Some _ -> _ =>
-      intros T; inversion T; clear T; subst; try (econstructor (solve[eauto]))
+Ltac fstep_inv :=
+  simpl;
+  match goal with
+  | |- (do _ <- ?x; _) = Some _ -> _ =>
+    let er := fresh "er" in
+    destruct x as [?|] eqn:er; try done
+  | |- Some ?v = Some ?v' -> _ =>
+    move=> [?]; subst
+  | |- match ?v with _ => _ end = Some _ -> _ =>
+    let em := fresh "em" in
+    destruct v eqn:em; try done
+  | |- None = Some _ -> _ => done
   end.
 
-(* TODO: bring back the equivalence proof
-Hint Unfold run_tmr.
-Hint Unfold apply_rule.
-Hint Unfold default_table.
-Hint Resolve Ptr_atom_inhabited.
-Theorem fstep_make_a_step : forall t st1 st2 tr,
-  fstep t st1 = Some (tr, st2) ->
-  step t st1 tr st2.
+Ltac step_rewrite :=
+  simpl;
+  match goal with
+  | H : ?x = Some _ |- context[do _ <- ?x; _] =>
+    rewrite H
+  | H : ?v = _ |- context[match ?v with _ => _ end] => rewrite H
+  end;
+  simpl.
+
+Lemma fstepP t st st' : fstep t st = Some st' <-> step t st st'.
 Proof.
-  destruct st1 as (μ,π,σ,regs,pc).
-  unfold fstep; simpl.
-  case_eq (μ[pc]); simpl bind; [|simpl bind; congruence].
-  intros ins Hins.
-  intros st2 tr.
-  destruct ins;
-  fstep_solver;
-  try solve [econstructor; eauto; auto].
-Admitted.
-(*
-  (* TODO: Figure out how to choose the correct econstructor *)
-  eapply step_memlab; eauto; auto.
-  eapply step_pclab; eauto; auto.
-  eapply step_bret; eauto; auto. admit. (* FIX RET! *)
-  eapply step_flowsto; eauto; auto.
-  eapply step_ljoin; eauto; auto.
-  eapply step_pushbot; eauto; auto.
-    instantiate (1 := l); auto.
-  eapply step_push; eauto; auto.
-  eapply step_binop; eauto; auto.
-  eapply step_jump; eauto; auto. admit.
-  eapply step_load; eauto; auto.
-  eapply step_store; eauto; auto. admit. (* WHY!? *)
-  eapply step_alloc; eauto; auto. admit.
-  eapply step_psetoff; eauto; auto.
+rewrite /fstep /= /state_instr_lookup /=; split.
+  case: st=> [im m st rs [pc pcl]] /=;
+  case get_instr: nth_error_Z => [instr|] //=.
+  destruct instr; repeat fstep_inv;
+  econstructor (solve [simpl; eauto]).
+by case; intros; subst; simpl in *;
+repeat step_rewrite.
 Qed.
-*)
-*)
+
 Fixpoint fstepN t (n : nat) (s : State) : list State :=
   match n with
     | O => (s :: nil)
@@ -927,8 +882,6 @@ Fixpoint fstepN t (n : nat) (s : State) : list State :=
         | None => (s :: nil)
       end
   end%list.
-
-Import ssreflect ssrbool eqtype.
 
 Lemma pc_eqP : Equality.axiom pc_eq.
 Proof.
