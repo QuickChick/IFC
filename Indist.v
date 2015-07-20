@@ -101,12 +101,12 @@ Defined.
    - Get all pairs that have been allocated in low contexts.
 *)
 
-Definition blocks_stamped_below (lab : Label) (m : memory) : seq frame :=
-  pmap (Mem.get_frame m) (Mem.get_blocks (allThingsBelow lab) m).
+Definition blocks_stamped_below (lab : Label) (m : memory) : seq mframe :=
+  Mem.get_blocks (allThingsBelow lab) m.
 
 Definition indistMemAsym lab m1 m2 :=
-  all (fun fr => has (fun fr' => indist lab fr fr')
-                     (blocks_stamped_below lab m2))
+  all (fun b =>
+         indist lab (Mem.get_frame m1 b) (Mem.get_frame m2 b))
       (blocks_stamped_below lab m1).
 
 Instance indistMem : Indist memory :=
@@ -117,8 +117,7 @@ Instance indistMem : Indist memory :=
 
 Proof.
 abstract by move=> obs m; rewrite andbb /indistMemAsym;
-apply/allP=> fr fr_in; apply/hasP; exists fr=> //;
-rewrite indistxx.
+apply/allP=> b b_in; rewrite indistxx.
 Defined.
 
 (* Indistinguishability of stack frames (pointwise)
