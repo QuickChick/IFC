@@ -99,19 +99,27 @@ Defined.
    - Get all corresponding memory frames
    - Make sure they are indistinguishable
    - Get all pairs that have been allocated in low contexts.
-     They have to be allocated in the same order so no need for fancy stuff
 *)
 
-Definition blocks_stamped_below (lab : Label) (m : memory) : list frame :=
+Definition blocks_stamped_below (lab : Label) (m : memory) : seq frame :=
   pmap (Mem.get_frame m) (Mem.get_blocks (allThingsBelow lab) m).
+
+Definition indistMemAsym lab m1 m2 :=
+  all (fun fr => has (fun fr' => indist lab fr fr')
+                     (blocks_stamped_below lab m2))
+      (blocks_stamped_below lab m1).
 
 Instance indistMem : Indist memory :=
 {|
   indist lab m1 m2 :=
-    indist lab (blocks_stamped_below lab m1) (blocks_stamped_below lab m2)
+    indistMemAsym lab m1 m2 && indistMemAsym lab m2 m1
 |}.
 
-Proof. abstract by move => obs m; rewrite indistxx. Defined.
+Proof.
+abstract by move=> obs m; rewrite andbb /indistMemAsym;
+apply/allP=> fr fr_in; apply/hasP; exists fr=> //;
+rewrite indistxx.
+Defined.
 
 (* Indistinguishability of stack frames (pointwise)
      * The returning pc's must be equal
