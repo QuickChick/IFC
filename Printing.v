@@ -151,8 +151,8 @@ Instance show_list {A : Type} `{_ : Show A} : Show (list A) :=
 Instance show_frame : Show frame :=
 {|
   show f :=
-    let '(Fr stmp lab data) := f in
-    "Stamp: " ++ show stmp ++ " Label: " ++ show lab ++ nl ++
+    let '(Fr lab data) := f in
+    "Label: " ++ show lab ++ nl ++
     show data
 |}.
 
@@ -229,11 +229,7 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
       else show_variation (show f1) (show f2)) ++ (
       (* Show actual corresponding frames *)
       match Mem.get_frame m1 f1, Mem.get_frame m2 f2 with
-        | Some (Fr stmp1 l1 data1), Some (Fr stmp2 l2 data2) =>
-          (if eqtype.eq_op stmp1 stmp2 then
-            (* same stamps *)
-            "Stamp: " ++ show stmp1
-          else "Stamp: " ++ show_variation (show stmp1) (show stmp2)) ++
+        | Some (Fr l1 data1), Some (Fr l2 data2) =>
           (if eqtype.eq_op l1 l2 then
             "DFR @ " ++ show l1 ++ " : [ "
                      ++ show_pair_list 0 lab data1 data2 ++ nl
@@ -242,13 +238,13 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
             "DFR @ " ++ (show_variation (show l1) (show l2)) ++ " : [ "
                      ++ (show_pair_list 0 lab data1 data2) ++ nl
                      ++ show_mem_pair_helper t lab m1 m2) ++ " ]"
-        | Some (Fr stmp1 l1 data1), None =>
+        | Some (Fr l1 data1), None =>
           "Frame " ++ show f1 ++ " corresponds to " ++ nl
-                   ++ show stmp1 ++ ", " ++ show l1 ++ " : [ "
+                   ++ show l1 ++ " : [ "
                    ++ show data1 ++ nl
-        | None, Some (Fr stmp2 l2 data2) =>
+        | None, Some (Fr l2 data2) =>
           "Frame " ++ show f2 ++ " corresponds to " ++ nl
-                   ++ show stmp2 ++ ", " ++ show l2 ++ " : [ "
+                   ++ show l2 ++ " : [ "
                    ++ show data2 ++ nl
         | _, _ => "Bad frames: " ++ show f1 ++ " vs "++ show f2
       end)

@@ -41,22 +41,22 @@ Inductive alloc_mode := Global | Local.
 (* Cannot make this a parameter because we don't want it opaque.
    Keep it outside for now, until I figure out what's better *)
 (* Any better solutions than the implicit arguments welcome *)
-Inductive frame {A S} := Fr (stamp : S) (label : S) : seq A -> @frame A S.
+Inductive frame {A S} := Fr (label : S) : seq A -> @frame A S.
 
 Section FrameEqType.
 
 Variables A S : eqType.
 
 Definition frame_eq (fr1 fr2 : @frame A S) : bool :=
-  let: Fr s1 l1 xs1 := fr1 in
-  let: Fr s2 l2 xs2 := fr2 in
-  [&& s1 == s2, l1 == l2 & xs1 == xs2].
+  let: Fr l1 xs1 := fr1 in
+  let: Fr l2 xs2 := fr2 in
+  [&& l1 == l2 & xs1 == xs2].
 
 Lemma frame_eqP : Equality.axiom frame_eq.
 Proof.
-move=> [s1 l1 xs1] [s2 l2 xs2]; apply/(iffP and3P).
-  by move=> [/eqP -> /eqP -> /eqP ->].
-by move => [-> -> ->]; rewrite !eqxx.
+move=> [l1 xs1] [l2 xs2]; apply/(iffP andP).
+  by move=> [/eqP -> /eqP ->].
+by move => [-> ->]; rewrite !eqxx.
 Qed.
 
 Definition frame_eqMixin := EqMixin frame_eqP.

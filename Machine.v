@@ -236,7 +236,7 @@ Canonical frame_eqType :=
 Definition alloc (size:Z) (lab stamp:Label) (a:Atom) (m:memory)
 : option (mframe * memory) :=
   match zreplicate size a with
-    | Some fr => Some (Mem.alloc Local m stamp (Fr stamp lab fr))
+    | Some fr => Some (Mem.alloc Local m stamp (Fr lab fr))
     | _ => None
   end.
 
@@ -244,7 +244,7 @@ Definition load (m : memory) (p : Pointer) : option Atom :=
   let '(Ptr f addr) := p in
   match Mem.get_frame m f with
     | None => None
-    | Some (Fr _ _ fr) => nth_error_Z fr addr
+    | Some (Fr _ fr) => nth_error_Z fr addr
   end.
 
 Definition store (m : memory) (p : Pointer) (a:Atom)
@@ -252,24 +252,24 @@ Definition store (m : memory) (p : Pointer) (a:Atom)
   let '(Ptr f addr) := p in
   match Mem.get_frame m f with
     | None => None
-    | Some (Fr stamp lab data) =>
+    | Some (Fr lab data) =>
       match update_list_Z data addr a with
         | None => None
-        | Some data' => (Mem.upd_frame m f (Fr stamp lab data'))
+        | Some data' => (Mem.upd_frame m f (Fr lab data'))
       end
   end.
 
 Definition msize (m:memory) (p:Pointer) : option nat :=
   let (fp,i) := p in
   match Mem.get_frame m fp with
-    | Some (Fr _ _ data) => Some (length data)
+    | Some (Fr _ data) => Some (length data)
     | _ => None
   end.
 
 Definition mlab (m:memory) (p:Pointer) : option Label :=
   let (fp,i) := p in
   match Mem.get_frame m fp with
-    | Some (Fr _ l _) => Some l
+    | Some (Fr l _) => Some l
     | _ => None
   end.
 
@@ -302,7 +302,7 @@ Lemma load_store : forall {m m'} {b ofs a},
 Proof.
   unfold store, load; intros.
   destruct (Mem.get_frame m b) eqn:E1; try congruence.
-  destruct f as [stmp lab l].
+  destruct f as [lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
   rewrite (Mem.get_upd_frame _ _ _ _ _ _ H).
   have [e|neb //] := (b =P b'); simpl in *.
@@ -357,7 +357,7 @@ Proof.
   unfold store.
   intros.
   destruct (Mem.get_frame m b) as [f|] eqn:FRAME; try congruence.
-  destruct f as [stamp lab l] eqn:?.
+  destruct f as [lab l] eqn:?.
   destruct (update_list_Z l off a) as [l'|] eqn:NEWFRAME; try congruence.
   eapply get_frame_upd_frame_neq; eauto.
 Qed.

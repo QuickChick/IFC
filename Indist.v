@@ -81,18 +81,15 @@ Proof. abstract by move => obs [v l]; rewrite eqxx indistxx orbT. Defined.
 Instance indistFrame : Indist frame :=
 {|
   indist lab f1 f2 :=
-    let '(Fr stamp1 l1 vs1) := f1 in
-    let '(Fr stamp2 l2 vs2) := f2 in
-    (stamp1 == stamp2) &&
-    if isLow stamp1 lab then
-      (* CH: this part is basically the same as indistinguishability of values;
-             try to remove this duplication at some point *)
-      (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)
-    else true
+    let '(Fr l1 vs1) := f1 in
+    let '(Fr l2 vs2) := f2 in
+    (* CH: this part is basically the same as indistinguishability of values;
+           try to remove this duplication at some point *)
+    (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)
 |}.
 
 Proof.
-  abstract by move => obs [s l vs]; rewrite !eqxx indistxx orbT /=; case: (isLow s obs).
+  abstract by move => obs [l vs]; rewrite !eqxx indistxx orbT /=.
 Defined.
 
 (* Indistinguishability of memories

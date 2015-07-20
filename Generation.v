@@ -354,26 +354,18 @@ Instance smart_vary_pc : SmartVary Ptr_atom :=
 
 Definition gen_var_frame (obs: Label) (inf : Info) (f : frame)
 : G frame :=
-    let '(Fr stamp lab data) := f in
+    let '(Fr lab data) := f in
     let gen_length :=
         choose (List.length data, S (List.length data)) in
     let gen_data :=
         bindGen gen_length (fun len => vectorOf len (smart_gen inf)) in
-    if isHigh stamp obs then
-      bindGen (smart_gen inf) (fun lab' =>
-      bindGen gen_data (fun data' =>
-      returnGen (Fr stamp lab' data')))
-    (* CH: above indistFrame allows different stamp *)
-    else if isHigh (stamp ∪ lab) obs then
+    if isHigh lab obs then
       (* CH: Can't understand the need for this case *)
       (* This is exactly the same as checking for isHigh lab obs*)
-      bindGen gen_data (fun data' =>
-      returnGen (Fr stamp lab data'))
+      bindGen gen_data (fun data' => returnGen (Fr lab data'))
     else
       bindGen (sequenceGen (map (smart_vary obs inf) data))
-              (fun data' =>
-      returnGen (Fr stamp lab data')).
-
+              (fun data' => returnGen (Fr lab data')).
 
 Instance smart_vary_frame : SmartVary frame :=
 {|
@@ -554,9 +546,9 @@ Definition failed_state : State :=
 
 Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
   match Mem.get_frame m mf with
-    | Some (Fr stamp lab data) =>
+    | Some (Fr lab data) =>
       bindGen (vectorOf (length data) (smart_gen inf)) (fun data' =>
-      match Mem.upd_frame m mf (Fr stamp lab data') with
+      match Mem.upd_frame m mf (Fr lab data') with
         | Some m' => returnGen m'
         | _ => pure m
       end)
@@ -579,7 +571,7 @@ Definition get_blocks_and_sizes (m : memory) :=
     let length :=
         match Mem.get_frame m b with
           | Some fr =>
-            let 'Fr _ _ data := fr in length data
+            let 'Fr _ data := fr in length data
           | _ => 0
         end in (b, Z.of_nat length)) (Mem.get_blocks elems m).
 

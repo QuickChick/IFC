@@ -137,15 +137,15 @@ Definition shrinkListAtom := shrinkList shrinkAtom.
 Instance shrVFrame : ShrinkV frame :=
 {|
   shrinkV vf :=
-    let '(Var obs (Fr stmp lab data1) (Fr stmp2 lab2 data2)) := vf in
+    let '(Var obs (Fr lab data1) (Fr lab2 data2)) := vf in
     if isLow lab obs then
       List.map (fun x => let '(Var _ ds1 ds2) := x in
-                    Var lab (Fr stmp lab ds1) (Fr stmp2 lab2 ds2))
+                    Var lab (Fr lab ds1) (Fr lab2 ds2))
           (shrink_datas obs data1 data2)
     else
-      List.map (fun data1' => Var lab (Fr stmp lab data1') (Fr stmp2 lab2 data2))
+      List.map (fun data1' => Var lab (Fr lab data1') (Fr lab2 data2))
           (shrinkListAtom data1) ++
-      List.map (fun data2' => Var lab (Fr stmp lab data1) (Fr stmp2 lab2 data2'))
+      List.map (fun data2' => Var lab (Fr lab data1) (Fr lab2 data2'))
           (shrinkListAtom data2)
 |}.
 

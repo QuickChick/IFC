@@ -71,7 +71,7 @@ Function reachable_from_root_set (obs : Label) (st : State)
         reachable_from_root_set obs st visited t
       else
         match Mem.get_frame (st_mem st) h with
-          | Some (Fr _ l atoms) =>
+          | Some (Fr l atoms) =>
             let newCands :=
                 if isLow l obs then
                   get_mframes_from_atoms obs atoms

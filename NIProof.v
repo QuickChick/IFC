@@ -216,7 +216,7 @@ Definition root_set obs (st : State) : {set mframe} :=
   root_set_registers obs r ∂pc :|: root_set_stack obs (unStack s).
 
 Definition link obs (mem : memory) (f1 f2 : mframe) :=
-  if Mem.get_frame mem f1 is Some (Fr _ l atoms) then
+  if Mem.get_frame mem f1 is Some (Fr l atoms) then
     isLow l obs && (f2 \in mframes_from_atoms obs atoms)
   else false.
 
@@ -259,8 +259,8 @@ Qed.
 
 Arguments reachable_alloc_int [μ μ' sz lab stamp i li fp l f1 f2] _.
 
-Lemma reachable_upd μ μ' pv st lf fr l f1 f2 :
-  Mem.upd_frame μ pv (Fr st lf fr) = Some μ' ->
+Lemma reachable_upd μ μ' pv lf fr l f1 f2 :
+  Mem.upd_frame μ pv (Fr lf fr) = Some μ' ->
   reachable l μ' f1 f2 -> reachable l μ f1 f2
   \/ isLow lf l /\ reachable l μ f1 pv
     /\ exists f3, f3 \in mframes_from_atoms l fr /\ reachable l μ f3 f2.
@@ -413,7 +413,7 @@ case: {st st'} step.
     move/eqP=> -> reach_f2.
     apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
     apply/(connect_trans _ reach_f2)/connect1; move: load_p mlab_p.
-    rewrite /link /=; case: (Mem.get_frame μ pv) => // [[_ ? fr]] get_pl [->].
+    rewrite /link /=; case: (Mem.get_frame μ pv) => // [[? fr]] get_pl [->].
     apply/andP; split=> //.
     exact: (mframes_from_atoms_nth get_pl).
   by apply: wf_st; rewrite inE in_stack_f1 orbT.
@@ -421,7 +421,7 @@ case: {st st'} step.
 + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
   rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
   case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-  case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+  case get_fp: (Mem.get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
   rewrite eq_lf in get_fp *.
   case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
@@ -440,7 +440,7 @@ case: {st st'} step.
 + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
   rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
   case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-  case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+  case get_fp: (Mem.get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
   rewrite eq_lf in get_fp *.
   case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
@@ -779,7 +779,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
     admit.
@@ -787,7 +787,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
     admit.
@@ -860,7 +860,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
     admit.
@@ -868,7 +868,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
     admit.
@@ -941,7 +941,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_p => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
     admit.
@@ -949,7 +949,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[stamp ? fr]] [eq_lf].
+    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
     admit.
