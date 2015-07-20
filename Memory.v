@@ -113,8 +113,7 @@ Module Type MEM.
 
   Parameter get_blocks_spec:
     forall {A} {S : eqType} (labs : seq S) (mem: t A S) (b: block S),
-      stamp b \in labs /\
-      (exists fr, get_frame mem b = Some fr) <->
+      (stamp b \in labs) && get_frame mem b <->
       b \in get_blocks labs mem.
 
   Parameter empty : forall A S, t A S.
@@ -540,13 +539,13 @@ Module Mem: MEM.
 
   Lemma get_blocks_spec :
     forall A (S : eqType) (labs : seq S) (mem: t A S) b,
-      stamp _ b \in labs /\
-      (exists fr, get_frame mem b = Some fr) <->
+      (stamp _ b \in labs) && get_frame mem b <->
       b \in get_blocks labs mem.
   Proof.
     intros A S labs mem b.
     split.
-    - intros [HIn [fr Hget]].
+    - case/andP => HIn.
+      case Hget: get_frame => [fr|] //= _.
       unfold get_blocks; apply/flatten_mapP.
       eexists; [eassumption|].
       unfold get_blocks_at_level. apply/mapP. exists b.1;
@@ -558,8 +557,10 @@ Module Mem: MEM.
     - intros HIn. unfold get_blocks, get_blocks_at_level in *.
       move/flatten_mapP in HIn. destruct HIn as [l HInl HIn].
       move/mapP in HIn. destruct HIn as [z HIn Heq]. subst.
-      split. assumption.
-      unfold get_frame. apply content_next. apply in_seq_Z in HIn; try omega.
+      rewrite HInl /=.
+      unfold get_frame.
+      suff [fr ->] : exists fr, mem (z, l) = Some fr by [].
+      apply content_next. apply in_seq_Z in HIn; try omega.
       apply Zle_minus_le_0. apply next_pos.
   Qed.
 
