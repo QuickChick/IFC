@@ -230,6 +230,9 @@ Definition memory := Mem.t Atom Label.
 (* Specialize the Memory frame declaration *)
 Definition frame := @frame Atom Label.
 
+Canonical frame_eqType :=
+  Eval hnf in EqType frame (frame_eqMixin [eqType of Atom] [eqType of Label]).
+
 Definition alloc (size:Z) (lab stamp:Label) (a:Atom) (m:memory)
 : option (mframe * memory) :=
   match zreplicate size a with
