@@ -84,7 +84,7 @@ Instance indistFrame : Indist frame :=
     let '(Fr stamp1 l1 vs1) := f1 in
     let '(Fr stamp2 l2 vs2) := f2 in
     (stamp1 == stamp2) &&
-    if isLow stamp1 lab && isLow stamp2 lab then
+    if isLow stamp1 lab then
       (* CH: this part is basically the same as indistinguishability of values;
              try to remove this duplication at some point *)
       (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)

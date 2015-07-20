@@ -1611,7 +1611,7 @@ Proof.
         rewrite Hjoin /=.
         move => /semBindSize [data'' [/semSequenceGenSize [Hlen Hforall]
                                       /semReturnSize [eq1 eq2 eq3]]]; subst.
-        rewrite List.map_length in Hlen. rewrite Flows.
+        rewrite List.map_length in Hlen.
         have Hindist_spec:
           (forall x y : Atom,
              List.In (x, y) (seq.zip data data') ->
@@ -1670,7 +1670,7 @@ Proof.
           }
           apply Hchoose in H; clear Hchoose; rename H into Hchoose.
           move: Hchoose => /andP [Hle3 Hle4].
-          simpl in Hle3, Hle4. rewrite Flows.
+          simpl in Hle3, Hle4.
           repeat (split => //; try apply/andP); (try by rewrite addn1);
           try by apply flows_refl.
           by move => a /Hforall/gen_atom_correct Hin. }
@@ -1702,7 +1702,6 @@ Proof.
     - move=> [/andP [/eqP H1 H2] [H3 H4]].
       subst.
       symmetry in Heqb.
-      rewrite Bool.andb_if in H2.
       rewrite Heqb in H2.
       move : H2 => /andP [/eqP H1 H2]; subst.
 (*       move: (flows_antisymm _ _ Hl1 Hl2) => Heq {Hl1 Hl2}; subst.
