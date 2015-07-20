@@ -121,7 +121,10 @@ Proof. abstract by move => obs m; rewrite indistxx. Defined.
 
 LL: NOTE: Only applicable to LOW stack frames
 *)
-Definition indistLowStackFrame lab sf1 sf2 :=
+
+Instance indistStackFrame : Indist StackFrame :=
+{|
+  indist lab sf1 sf2 :=
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
         if isLow (pc_lab p1) lab || isLow (pc_lab p2) lab then
@@ -131,7 +134,11 @@ Definition indistLowStackFrame lab sf1 sf2 :=
         && (r1 == r2 :> Z)
         && (l1 == l2)
         else true
-    end.
+    end
+|}.
+Proof.
+abstract by move=> obs [ra rs rr rl]; rewrite !eqxx indistxx /=; case: ifP.
+Defined.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   let 'SF ret_addr  _ _ _ := sf in
@@ -147,10 +154,13 @@ Instance indistStack : Indist Stack :=
     let s1' := filterStack lab s1 in
     let s2' := filterStack lab s2 in
     (size s1' == size s2')
-    && all (fun p => indistLowStackFrame lab p.1 p.2) (zip s1' s2')
+    && all (fun p => indist lab p.1 p.2) (zip s1' s2')
 |}.
-Proof. admit. Defined.
-(* Proof. abstract by move => obs r; rewrite indistxx. Defined.*)
+Proof.
+abstract by move=> obs s; rewrite eqxx andTb (lock (@indist)) /=;
+elim: (filterStack _ _)=> {s} [|sf s /= ->] //;
+rewrite -lock indistxx.
+Defined.
 
 Instance indistImems : Indist imem :=
 {|

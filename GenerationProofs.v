@@ -1307,7 +1307,7 @@ Lemma gen_vary_stack_loc_correct : forall obs loc,
    semGenSize (gen_vary_stack_loc obs inf loc) size <-->
               (fun loc' => stack_loc_spec loc'  /\
                            if isLow (pc_lab (sf_return_addr loc)) obs
-                           then indistLowStackFrame obs loc loc'
+                           then indist obs loc loc'
                            else isHigh (pc_lab (sf_return_addr loc')) obs).
 Opaque gen_vary_pc gen_label gen_from_nat_length.
 rewrite /stack_loc_spec /gen_vary_stack_loc.
@@ -1338,10 +1338,7 @@ split; simpl.
       rewrite /atom_spec.
       destruct reg' eqn:Reg'.
       by move: Hsem => [_ Hspec].
-    - rewrite /indist /indistLowStackFrame.
-      apply /andP; split => //=.
-      apply /andP; split => //=.
-      apply /andP; split => //=.
+    - rewrite /indist /= orbb !eqxx /= !andbT Flows.
       rewrite /indist /indistList.
       rewrite !size_length Hlen -!size_length size_map eqxx /=.
       apply/allP=> - [/= reg reg'] HIn.
@@ -1426,7 +1423,7 @@ split; simpl.
         destruct reg' eqn:Reg'.
         * split => //=.
           subst.
-          rewrite /indist /indistLowStackFrame in Hindist.
+          rewrite /indist /= Flows /= in Hindist.
           move: Hindist => /andP [/andP [/andP [? Hindist] ?] ?].
           rewrite /indist /indistList in Hindist.
           move:  Hindist => /andP [? /allP H].
@@ -1436,7 +1433,7 @@ split; simpl.
         * move/seq_InP in HIn1. by apply Hregs' in HIn1.
     }
     - apply semReturnSize.
-      rewrite /indist /indistLowStackFrame in Hindist.
+      rewrite /indist /= Flows in Hindist.
       move: Hindist => /andP [/andP [/andP [/eqP Heq1 Hindist] /eqP Heq2] /eqP Heq3]; subst.
       by inv Heq1.
   }
@@ -1515,13 +1512,13 @@ Proof.
             simpl in *.
             destruct (isLow l obs) eqn:Flows.
             - { (* l <: obs *)
-              simpl in H.
+              rewrite /indist /= Flows /= in H.
               move: H => /andP [/andP [/andP [/eqP Heq1
                                             Hindist]
                                      /eqP Heq3]
                               /eqP Heq4]; subst.
               inv Heq1.
-              by rewrite /= Flows /= Flows /= !eqxx /= !andbT.
+              by rewrite /indist Flows /= Flows !andbT !eqxx !andbT.
               }
             - rewrite /negb in H.
               destruct (isLow l0 obs) eqn:Flows' => //=.
@@ -1537,8 +1534,7 @@ Proof.
         }
     }
     (* Completeness *)
-    + Opaque indistLowStackFrame.
-      move => [Hindist [Hspec' Hlen]].
+    + move => [Hindist [Hspec' Hlen]].
       rewrite /gen_vary_stack /gen_vary_low_stack.
       apply semLiftGenSize.
       destruct st' as [st'].
