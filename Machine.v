@@ -428,8 +428,6 @@ Local Open Scope Z_scope.
 (* CH: we only need to instantiate this for the default table,
        so we could even consider baking it in *)
 
-Close Scope form_scope.
-
 Inductive step (t : table) : State -> State -> Prop :=
  | step_lab: forall im μ σ v K pc r r' r1 r2 j LPC rl rpcl
      (PC: pc = PAtm j LPC)
