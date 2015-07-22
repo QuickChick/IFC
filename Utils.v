@@ -1,5 +1,6 @@
 Require Import ZArith. (* omega *)
 Require Import List.
+Require Import ssreflect ssrbool eqtype seq.
 
 (** * Useful tactics *)
 Ltac inv H := inversion H; clear H; subst.
@@ -263,18 +264,6 @@ Ltac simpl_exists_tag :=
   | [ H: exists _, ?x = (_,_) |- _ ] => destruct H; subst x; simpl
   end.
 
-
-(* And basic lemmas *)
-Lemma rev_nil_nil (A: Type) : forall (l: list A),
-  rev l = nil ->
-  l = nil.
-Proof.
-  induction l; intros ; auto.
-  simpl in *.
-  exploit app_eq_nil ; eauto.
-  intros [Hcont1 Hcont2].
-  inv Hcont2.
-Qed.
 
 (* Monad notation *)
 
@@ -619,7 +608,7 @@ Proof.
   induction l ; intros.
   destruct a ; simpl in *; inv H.
   destruct a0 ; simpl in *; inv H; auto.
-  case_eq (update_list l a0 v) ; intros ; rewrite H in * ; inv H1.
+  case_eq (update_list l a0 v) ; intros ; rewrite -> H in * ; inv H1.
   auto.
 Qed.
 
@@ -768,7 +757,7 @@ Lemma update_list_Z_Some (T:Type): forall (v:T) l (i:Z),
 Proof.
   intros. unfold update_list_Z.
   destruct (i <? 0)%Z eqn:?.
-  - rewrite Z.ltb_lt in Heqb. omega.
+  - rewrite -> Z.ltb_lt in Heqb. omega.
   - eapply update_list_Some; eauto.
 Qed.
 
@@ -913,7 +902,7 @@ Proof.
   induction 1.
   - auto.
   - inversion 1.
-    + rewrite app_nil_r.
+    + rewrite cats0.
       subst; econstructor; eauto.
     + subst; econstructor; eauto.
       rewrite op_cons_app; reflexivity.
@@ -954,26 +943,6 @@ Proof.
     intros []; eauto.
 Qed.
 
-Lemma swap_In :
-  forall T n (l l' : list T) x
-         (SWAP : swap n l = Some l')
-         (IN : In x l'),
-    In x l.
-Proof.
-  unfold swap.
-  intros.
-  destruct l as [|y l]; try congruence.
-  destruct n as [|n]; simpl in *.
-  - inv SWAP. eauto.
-  - destruct (nth_error l n) as [x'|] eqn:IDX; try congruence.
-    destruct (update_list l n y) as [l''|] eqn:UPD; try congruence.
-    inv SWAP.
-    destruct IN as [H | H]; subst; eauto.
-    clear - UPD H.
-    exploit update_list_In; eauto.
-    intros []; auto.
-Qed.
-
 Lemma nth_error_app :
   forall T n (l1 l2 : list T) x,
     nth_error l1 n = Some x ->
@@ -996,106 +965,45 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma swap_app :
-  forall T n (l1 l1' l2 : list T)
-         (SWAP : swap n l1 = Some l1'),
-    swap n (l1 ++ l2) = Some (l1' ++ l2).
-Proof.
-  unfold swap.
-  intros.
-  destruct l1 as [|y l1]; simpl; try congruence.
-  destruct (nth_error (y :: l1) n) as [x|] eqn:SWAP'; allinv.
-  eapply nth_error_app in SWAP'.
-  simpl in SWAP'.
-  rewrite SWAP'.
-  eapply update_list_app in SWAP.
-  simpl in *.
-  eauto.
-Qed.
-
-Lemma swap_forall :
-  forall T (P : T -> Prop) n l l'
-         (SWAP : swap n l = Some l')
-         (FORALL : forall x, In x l -> P x),
-    forall x, In x l' -> P x.
-Proof.
-  unfold swap.
-  intros.
-  destruct l as [|y l]; try congruence.
-  destruct (nth_error (y :: l) n) as [x'|] eqn:IDX; try congruence.
-  destruct n as [|n]; simpl in *; allinv; simpl in *; eauto.
-  match goal with
-    | H : (match ?UP with _ => _ end) = _ |- _ =>
-      destruct UP as [l''|] eqn:?; simpl in *; try congruence
-  end.
-  allinv.
-  destruct H.
-  - subst. eauto.
-  - exploit update_list_In; eauto.
-    intros [? | ?]; subst; eauto.
-Qed.
-
-Fixpoint drop {X:Type} (n:nat) (xs:list X) : list X :=
-match n with
-| O => xs
-| S n' => match xs with
-          | nil => nil
-          | (x::xs') => drop n' xs'
-          end
-end.
-
-Definition dropZ {X:Type} (z:Z) (xs:list X) : list X :=
+Definition dropZ {X:Type} (z:Z) (xs:seq X) : seq X :=
   if (z <? 0)%Z then
     xs
   else drop (Z.to_nat z) xs.
 
-
-Lemma length_drop : forall {X:Type} n (xs:list X),
-           length (drop n xs) = ((length xs) -  n)%nat.
-Proof.
-  intros X n. induction n; intros xs.
-    simpl. omega.
-    destruct xs. simpl.
-       auto.
-       simpl. auto.
-Qed.
-
 Lemma drop_cons : forall {X:Type} p (l : list X),
-    (p < length l)%nat ->
+    (p < size l)%nat ->
     exists x,
       drop p l = x :: drop (S p) l.
 Proof.
-  induction p; intros [|x l] H; simpl in *; try omega; eauto.
-  apply IHp.
-  omega.
+move=> X; elim=> [|p IH] [|x l] H; simpl in *; try omega; eauto.
+  by rewrite drop0; eauto.
+apply IH; omega.
 Qed.
 
-Import ListNotations.
-
 Lemma dropZ_all: forall {X:Type} (xs:list X),
-  (dropZ (Z.of_nat (length xs)) xs = []).
+  (dropZ (Z.of_nat (size xs)) xs = [::]).
 Proof.
   intros.
-  destruct (dropZ (Z.of_nat (length xs)) xs) eqn:E. auto.
+  destruct (dropZ (Z.of_nat (size xs)) xs) eqn:E. auto.
   exfalso.
-  unfold dropZ in E.  destruct (Z.of_nat (length xs) <? 0)%Z eqn:M.
+  unfold dropZ in E.  destruct (Z.of_nat (size xs) <? 0)%Z eqn:M.
     apply Z.ltb_lt in M.  omega.
-    rewrite Nat2Z.id in E.
-    assert (length (drop (length xs) xs) = length (x::l)). rewrite E; auto.
-    rewrite length_drop in H. simpl in H. replace (length xs - length xs)%nat with O in H by omega. inv H.
+  rewrite Nat2Z.id in E.
+  assert (size (drop (size xs) xs) = size (x::l)). rewrite E; auto.
+  by rewrite size_drop /= ssrnat.subnn in H.
 Qed.
 
 Lemma dropZ_nil :
   forall X (i : Z) (l : list X)
          (POS : (i >= 0)%Z)
-         (BOUNDS : dropZ i l = []),
-    (i >= Z.of_nat (length l))%Z.
+         (BOUNDS : dropZ i l = [::]),
+    (i >= Z.of_nat (size l))%Z.
 Proof.
   intros.
-  destruct (Z_lt_dec i (Z.of_nat (length l))) as [H|]; try omega.
+  destruct (Z_lt_dec i (Z.of_nat (size l))) as [H|]; try omega.
   unfold dropZ in *.
   destruct (Z.ltb_spec0 i 0); try omega.
-  rewrite Z2Nat.inj_lt in H; try omega.
+  rewrite -> Z2Nat.inj_lt in H; try omega.
   rewrite Nat2Z.id in H.
   apply drop_cons in H.
   destruct H.
@@ -1125,57 +1033,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma nth_error_drop :
-  forall X (i i' : nat) (l : list X),
-    nth_error l (i + i') = nth_error (drop i' l) i.
-Proof.
-  intros X i.
-  induction i as [|i IH]; auto using nth_error_drop_zero.
-  intros [|i'] [|a l]; try reflexivity.
-  - rewrite plus_0_r. reflexivity.
-  - simpl.
-    rewrite IH.
-    destruct (lt_dec i' (length l)) as [LT|GTE].
-    + apply drop_cons in LT.
-      destruct LT as [x H]. rewrite H. reflexivity.
-    + assert (LEN := length_drop i' l).
-      replace (length l - i')%nat with 0%nat in LEN by omega.
-      assert (LEN' := length_drop (S i') l).
-      replace (length l - S i')%nat with 0%nat in LEN' by omega.
-      destruct (drop i' l), (drop (S i') l); simpl in *; try discriminate.
-      destruct i; reflexivity.
-Qed.
-
-Lemma nth_error_Z_dropZ :
-  forall X (i i' : Z) (l : list X)
-         (POS1 : (i' >= 0)%Z)
-         (POS2 : (i >= 0)%Z),
-    nth_error_Z l (i + i') = nth_error_Z (dropZ i' l) i.
-Proof.
-  intros.
-  unfold nth_error_Z, dropZ.
-  destruct (Z.ltb_spec0 i' 0); try omega.
-  destruct (Z.ltb_spec0 i 0); try omega.
-  destruct (Z.ltb_spec0 (i + i') 0); try omega.
-  rewrite Z2Nat.inj_add; try omega.
-  apply nth_error_drop.
-Qed.
-
-Lemma dropZ_cons :
-  forall X i (l : list X)
-         (BOUNDS : (0 <= i < Z.of_nat (length l))%Z),
-    exists x, dropZ i l = x :: dropZ (Z.succ i) l.
-Proof.
-  intros.
-  unfold dropZ.
-  destruct (Z.ltb_spec0 i 0); try omega.
-  destruct (Z.ltb_spec0 (Z.succ i) 0); try omega.
-  rewrite Z2Nat.inj_succ; try omega.
-  apply drop_cons.
-  rewrite <- Nat2Z.id.
-  rewrite <- Z2Nat.inj_lt; omega.
-Qed.
-
 Inductive match_options {A B} (R : A -> B -> Prop) : option A -> option B -> Prop :=
 | mo_none : match_options R None None
 | mo_some : forall a b, R a b -> match_options R (Some a) (Some b).
@@ -1187,16 +1044,6 @@ Proof.
   induction 1; eauto; simpl; congruence.
 Qed.
 
-Fixpoint take {T} (n : nat) (l : list T) : list T :=
-  match n with
-    | O => []
-    | S n' =>
-      match l with
-        | [] => []
-        | x :: l' => x :: take n' l'
-      end
-  end.
-
 Lemma nth_error_app' X : forall (l1 l2 : list X) (x : X),
                             nth_error (l1 ++ x :: l2) (length l1) = Some x.
 Proof.
@@ -1206,7 +1053,7 @@ Qed.
 (* List helpers *)
 Fixpoint concat {A : Type} (l : list (list A)) : (list A) :=
   match l with
-    | [] => []
+    | [::] => [::]
     | (h :: t) => h ++ concat t
   end.
 
@@ -1226,7 +1073,7 @@ Definition option_bind {X Y} (f : X -> option Y) (o : option X) :=
 
 Fixpoint powerset {A : Type} (l : list A) : (list (list A)) :=
   match l with
-    | [] => [[]]
+    | [::] => [:: [::]]
     | h::t =>
       let p := powerset t in
       map (cons h) p ++ p
@@ -1242,8 +1089,6 @@ Definition emptyList {A} (l : list A) : bool :=
   | nil => true
   | _ => false
   end.
-
-Require Import ssreflect ssrbool eqtype.
 
 Lemma Z_eqbP : Equality.axiom Z.eqb.
 Proof.

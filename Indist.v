@@ -168,7 +168,6 @@ Instance indistImems : Indist imem :=
 
 Proof. abstract by move => _ r; exact: eqxx. Defined.
 
-
 Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
