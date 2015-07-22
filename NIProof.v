@@ -756,13 +756,17 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       have [low_K|//] := boolP (isLow K obs).
       move: indist_B; rewrite low_K {1}/indist /= => /eqP [<-].
       rewrite eqSS; case/andP: indist_stack=> -> ->; rewrite /= andbT.
-      admit.
+      rewrite /indist /= !eqxx !andbT /= indist_r.
+      by case: ifP.
     case/orP: indist_addr; first by rewrite flows_join => /negbTE->.
     by move/eqP => [<-]; rewrite indist_r eqxx implybT.
   (* BRet *)
-  + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
+  + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> /= CODE get_r1.
     rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
-    case: ifPn=> // Hjoins [<- <-] upd_r1.
+    case: ifPn=> // Hjoins [<- <-] upd_r1 low_pc indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2 => [im2 μ2 [[|sf σ2]] regs2 [pcv2 pcl2]] //=.
+    case: sf=> [[jp LPC''] regs2'].
     admit.
   (* Alloc *)
   + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
