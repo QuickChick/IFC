@@ -122,8 +122,6 @@ Defined.
      * The saved registers must be indistinguishable
      * The returning register must be the same
      * The returning labels must be equal
-
-LL: NOTE: Only applicable to LOW stack frames
 *)
 
 Instance indistStackFrame : Indist StackFrame :=
@@ -131,17 +129,14 @@ Instance indistStackFrame : Indist StackFrame :=
   indist lab sf1 sf2 :=
     match sf1, sf2 with
       | SF p1 regs1 r1 l1, SF p2 regs2 r2 l2 =>
-        if isLow (pc_lab p1) lab || isLow (pc_lab p2) lab then
-
-           (p1 == p2)
-        && indist lab regs1 regs2
-        && (r1 == r2 :> Z)
-        && (l1 == l2)
-        else true
+        (isLow (pc_lab p1) lab || isLow (pc_lab p2) lab) ==>
+        [&& p1 == p2,
+            indist lab regs1 regs2,
+            r1 == r2 :> Z & l1 == l2]
     end
 |}.
 Proof.
-abstract by move=> obs [ra rs rr rl]; rewrite !eqxx indistxx /=; case: ifP.
+abstract by move=> obs [ra rs rr rl]; rewrite !eqxx indistxx /= implybT.
 Defined.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=

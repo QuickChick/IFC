@@ -1422,7 +1422,7 @@ split; simpl.
         * split => //=.
           subst.
           rewrite /indist /= Flows /= in Hindist.
-          move: Hindist => /andP [/andP [/andP [? Hindist] ?] ?].
+          case/and4P: Hindist => [? Hindist ? ?].
           rewrite /indist /indistList in Hindist.
           move:  Hindist => /andP [? /allP H].
           apply in_zip_swap in HInZip.
@@ -1431,8 +1431,8 @@ split; simpl.
         * move/seq_InP in HIn1. by apply Hregs' in HIn1.
     }
     - apply semReturnSize.
-      rewrite /indist /= Flows in Hindist.
-      move: Hindist => /andP [/andP [/andP [/eqP Heq1 Hindist] /eqP Heq2] /eqP Heq3]; subst.
+      rewrite /indist /= Flows /= in Hindist.
+      case/and4P: Hindist => [/eqP Heq1 Hindist /eqP Heq2 /eqP Heq3]; subst.
       by inv Heq1.
   }
   * apply semBindSize.
@@ -1511,10 +1511,7 @@ Proof.
             destruct (isLow l obs) eqn:Flows.
             - { (* l <: obs *)
               rewrite /indist /= Flows /= in H.
-              move: H => /andP [/andP [/andP [/eqP Heq1
-                                            Hindist]
-                                     /eqP Heq3]
-                              /eqP Heq4]; subst.
+              move/and4P: H => [/eqP Heq1 Hindist /eqP Heq3 /eqP Heq4]; subst.
               inv Heq1.
               by rewrite /indist Flows /= Flows !andbT !eqxx !andbT.
               }

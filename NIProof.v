@@ -756,8 +756,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       have [low_K|//] := boolP (isLow K obs).
       move: indist_B; rewrite low_K {1}/indist /= => /eqP [<-].
       rewrite eqSS; case/andP: indist_stack=> -> ->; rewrite /= andbT.
-      rewrite /indist /= !eqxx !andbT /= indist_r.
-      by case: ifP.
+      by rewrite /indist /= !eqxx !andbT /= indist_r implybT.
     case/orP: indist_addr; first by rewrite flows_join => /negbTE->.
     by move/eqP => [<-]; rewrite indist_r eqxx implybT.
   (* BRet *)
