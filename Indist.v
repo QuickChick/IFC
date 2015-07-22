@@ -49,6 +49,11 @@ Proof.
   abstract by move => obs; elim => [|x l IH] //=; rewrite indistxx IH.
 Defined.
 
+Lemma indist_cons {A} `{Indist A} obs x1 l1 x2 l2 :
+  indist obs (x1 :: l1) (x2 :: l2) =
+  indist obs x1 x2 && indist obs l1 l2.
+Proof. by rewrite {1 3}/indist /= eqSS; bool_congr. Qed.
+
 (* Indistinguishability of Values.
    - Ignores the label (called only on unlabeled things)
    - Just syntactic equality thanks to the per-stamp-level allocator!
@@ -144,21 +149,13 @@ Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
   let 'PAtm _ l_ret_addr := ret_addr in
   flows l_ret_addr lab.
 
-Definition filterStack (lab : Label) (s : Stack) : list StackFrame :=
-  (List.filter (stackFrameBelow lab) (unStack s)).
-
 Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
-    let s1' := filterStack lab s1 in
-    let s2' := filterStack lab s2 in
-    (size s1' == size s2')
-    && all (fun p => indist lab p.1 p.2) (zip s1' s2')
+    indist lab (unStack s1) (unStack s2)
 |}.
 Proof.
-abstract by move=> obs s; rewrite eqxx andTb (lock (@indist)) /=;
-elim: (filterStack _ _)=> {s} [|sf s /= ->] //;
-rewrite -lock indistxx.
+abstract by move=> obs s; rewrite indistxx.
 Defined.
 
 Instance indistImems : Indist imem :=
@@ -172,14 +169,21 @@ Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
     [&& indist lab (st_imem st1) (st_imem st2),
-    indist lab (st_mem st1) (st_mem st2),
-    indist lab (st_stack st1) (st_stack st2) &
-    (isLow ∂(st_pc st1) lab || isLow ∂(st_pc st2) lab) ==>
-      [&& st_pc st1 == st_pc st2  & indist lab (st_regs st1) (st_regs st2)]]
+        indist lab (st_mem st1) (st_mem st2) &
+        if isLow ∂(st_pc st1) lab || isLow ∂(st_pc st2) lab then
+          [&& st_pc st1 == st_pc st2,
+              indist lab (st_stack st1) (st_stack st2)
+              & indist lab (st_regs st1) (st_regs st2)]
+        else
+          let lowsf sf :=
+            let: SF (PAtm _ lab') _ _ _ := sf in flows lab' lab in
+          let cropTop st := drop (find lowsf st) st in
+          indist lab (cropTop (unStack (st_stack st1)))
+                     (cropTop (unStack (st_stack st2))) ]
 |}.
 
 Proof.
-  abstract by move => obs [imem m stk regs [v l]]; rewrite !indistxx eqxx implybT.
+abstract by move => obs [imem m stk regs [v l]]; rewrite !indistxx eqxx /=; case: ifP.
 Defined.
 
 End IndistM.

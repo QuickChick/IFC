@@ -1502,8 +1502,7 @@ Proof.
             inv Hforall.
             apply gen_vary_stack_loc_correct in H3 => //=.
             move : H3 => [? H].
-            rewrite /indist /indistStack.
-            rewrite /filterStack /stackFrameBelow.
+            rewrite /indist /indistStack /stackFrameBelow.
             destruct loc eqn:Loc; destruct s eqn:S;
             destruct sf_return_addr0 eqn:Ret0;
             destruct sf_return_addr1 eqn:Ret1;
@@ -1513,10 +1512,9 @@ Proof.
               rewrite /indist /= Flows /= in H.
               move/and4P: H => [/eqP Heq1 Hindist /eqP Heq3 /eqP Heq4]; subst.
               inv Heq1.
-              by rewrite /indist Flows /= Flows !andbT !eqxx !andbT.
+              by rewrite /indist /= /indist /= Flows /= !andbT !eqxx !andbT.
               }
-            - rewrite /negb in H.
-              destruct (isLow l0 obs) eqn:Flows' => //=.
+            - by rewrite /indist /= /indist /= Flows (negbTE H) /=.
           }
           + rewrite /stack_spec. right.
             exists s; split => //=.
@@ -1532,47 +1530,17 @@ Proof.
     + move => [Hindist [Hspec' Hlen]].
       rewrite /gen_vary_stack /gen_vary_low_stack.
       apply semLiftGenSize.
-      destruct st' as [st'].
-      destruct st' as [ | loc' st'] => //=.
-      simpl in Hlen.
-      inv Hlen.
-      destruct st' => //=.
-      exists [:: loc']; split => //=.
-      apply semSequenceGenSize; split => //=.
-      constructor => //=.
-      apply gen_vary_stack_loc_correct => //=.
-      split => //=.
-      - rewrite /stack_spec in Hspec'.
-        case : Hspec' => [// | [loc'' [Heq Hs]]].
-        by inv Heq.
-      - destruct loc; destruct loc';
-        destruct sf_return_addr0; destruct sf_return_addr1; simpl in Hindist.
-        destruct (isLow l obs) eqn:Flows.
-        + {
-            rewrite /indist /indistStack /= in Hindist.
-            move/andP: Hindist => [Hlen Hindist].
-            rewrite /filterStack /stackFrameBelow in Hindist.
-            simpl in *.
-            rewrite Flows in Hindist.
-            destruct (isLow l0 obs) eqn:Flows'.
-            * rewrite Flows.
-              rewrite /= andbT in Hindist.
-              by apply Hindist => //=.
-            * rewrite Flows.
-              rewrite /= in Hindist.
-              rewrite /filterStack /stackFrameBelow in Hlen.
-              simpl in Hlen.
-              rewrite Flows Flows' in Hlen.
-              inv Hlen.
-          }
-       + rewrite Flows.
-         rewrite /indist /indistStack in Hindist.
-         move/andP: Hindist => [Hlen Hindist].
-         rewrite /filterStack /stackFrameBelow in Hlen.
-         simpl in *.
-         destruct (isLow l0 obs) eqn:Flows' => //=.
-         rewrite Flows in Hlen.
-         inv Hlen.
+      case: st' Hindist Hspec' Hlen=> [[|loc' [|]]] //= /andP [_ /= /andP [Hindist _]].
+      case=> [|[loc'' [[<-] {loc''} Hspec']]] // _.
+      exists [:: loc']; split => //=; apply semSequenceGenSize; split => //=.
+      constructor => //=; apply gen_vary_stack_loc_correct => //; split => //.
+      case: loc loc' Hspec Hspec' Hindist
+            => [[pc pcl] rs rr rl] [[pc' pcl'] rs' rr' rl'] /=.
+      move=> Hspec Hspec' Hindist; rewrite Hindist.
+      move: Hindist; rewrite /indist /=.
+      case: ifP => [//|/= hi_pcl] /implyP H.
+      apply/negP=> l_pcl'; case/andP: (H l_pcl') => [/eqP [??] _]; subst pcl'.
+      by rewrite hi_pcl in l_pcl'.
 Qed.
 
 (* Vary Memory *)
