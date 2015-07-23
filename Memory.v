@@ -147,22 +147,10 @@ Module Type MEM.
   Parameter alloc_upd : forall A (S : eqType) am (m:t A S) b fr1 s fr2 m',
     upd_frame m b fr1 = Some m' ->
     fst (alloc am m' s fr2) = fst (alloc am m s fr2).
-  Parameter alloc_local_comm :
-    forall A (S : eqType) (m m1 m2 m1' m2':t A S) s s' fr fr' b1 b2 b1',
-    s <> s' ->
-    alloc Local m s fr = (b1,m1) ->
-    alloc Local m1 s' fr' = (b2,m2) ->
-    alloc Local m s' fr' = (b1',m1') ->
-    b1' = b2.
-  Parameter alloc2_local :
-    forall A (S : eqType) (m1 m2 m1' m2':t A S) s fr1 fr2 fr' b,
-    alloc Local m1 s fr1 = (b,m1') ->
-    alloc Local m2 s fr2 = (b,m2') ->
-    fst (alloc Local m1' s fr') = fst (alloc Local m2' s fr').
-
-  Parameter alloc_next_block_no_fr :
-    forall A (S : eqType) (m:t A S) s fr1 fr2,
-    fst (alloc Local m s fr1) = fst (alloc Local m s fr2).
+  Parameter alloc_local :
+    forall A (S : eqType) (m1 m2:t A S) s fr1 fr2,
+      (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
+      (alloc Local m1 s fr1).1 = (alloc Local m2 s fr2).1.
 
   Parameter map : forall {A B S}, (@frame A S -> @frame B S) -> t A S -> t B S.
   Parameter map_spec : forall A B S (f: @frame A S -> @frame B S) (m:t A S),
@@ -452,36 +440,30 @@ Module Mem: MEM.
     rewrite T; auto.
   Qed.
 
-  Lemma alloc_local_comm :
-    forall A (S : eqType) (m m1 m2 m1' m2':t A S) s s' fr fr' b1 b2 b1',
-    s <> s' ->
-    alloc Local m s fr = (b1,m1) ->
-    alloc Local m1 s' fr' = (b2,m2) ->
-    alloc Local m s' fr' = (b1',m1') ->
-    b1' = b2.
+  Lemma alloc_local :
+    forall A (S : eqType) (m1 m2:t A S) s fr1 fr2,
+      (forall b, stamp _ b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
+      (alloc Local m1 s fr1).1 = (alloc Local m2 s fr2).1.
   Proof.
-    intros A S m m1 m2 m1' m2' s s' fr fr' b1 b2 b1' H H0 H1 H2.
-    inv H0; inv H1; inv H2.
-    destruct (s =P s'); try congruence.
-  Qed.
-
-  Lemma alloc2_local :
-    forall A (S : eqType) (m1 m2 m1' m2':t A S) s fr1 fr2 fr' b,
-    alloc Local m1 s fr1 = (b,m1') ->
-    alloc Local m2 s fr2 = (b,m2') ->
-    fst (alloc Local m1' s fr') = fst (alloc Local m2' s fr').
-  Proof.
-    intros A S m1 m2 m1' m2' s fr1 fr2 fr' b H H0.
-    inv H; inv H0; simpl.
-    rewrite H1; auto.
-  Qed.
-
-  Lemma alloc_next_block_no_fr :
-    forall A (S : eqType) (m:t A S) s fr1 fr2,
-    fst (alloc Local m s fr1) = fst (alloc Local m s fr2).
-  Proof.
-    intros A S m s fr1 fr2.
-    unfold alloc; simpl; auto.
+    move=> A S [c1 n1 cn1 np1] [c2 n2 cn2 np2] s fr1 fr2.
+    rewrite /get_frame /alloc /= => Pc12; congr pair.
+    suff: forall i, (1 <= i < n1 s)%Z <-> (1 <= i < n2 s)%Z.
+      move: (n1 s) (n2 s) (np1 s) (np2 s)=> {np1 np2} s1 s2 np1 np2 H.
+      have: forall s1 s2, (1 <= s1)%Z -> (1 <= s2)%Z ->
+                          (forall i, (1 <= i < s1)%Z -> (1 <= i < s2)%Z) ->
+                          (s1 <= s2)%Z.
+        move=> {s1 s2 np1 np2 H} s1 s2 np1 np2 H.
+        have [?|p]: (s1 = 1)%Z \/ (1 < s1)%Z by omega.
+          by subst s1.
+        suff: (s1 - 1 < s2)%Z by move=> ?; omega.
+        move: (H (s1 - 1)%Z) => ?; omega.
+      move=> H'.
+      move: (H' _ _ np1 np2 (fun i => (H i).1)) => H1.
+      move: (H' _ _ np2 np1 (fun i => (H i).2)) => H2.
+      omega.
+    move=> i; rewrite -> cn1, -> cn2.
+    move: (Pc12 (i, s) erefl).
+    case: (c1 _) => [fr1'|]; case: (c2 _) => [fr2'|] //= _; intuition eauto.
   Qed.
 
   Lemma in_seq_Z:
