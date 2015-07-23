@@ -1039,85 +1039,60 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     admit.
 - case: step1 high_pc1 low_pc1' indist_s1s2.
   (* Lab *)
-  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 high_pc1.
-    admit.
+  + by move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 /negbTE ->.
   (* PcLab *)
-  + move=> im μ σ pc r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
-    admit.
+  + by move=> im μ σ pc r r' r1 j LPC rl rpcl -> /= CODE [<- <-] upd_r1 /negbTE ->.
   (* MLab *)
-  + move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [].
-    rewrite /Vector.nth_order /= => <- <- upd_r2.
-    admit.
+  + by move=> im μ σ pc r r1 r2 p K C j LPC rl r' rpcl -> ? ? get_r1 [] /= _ <- _ /negbTE ->.
   (* PutLab *)
-  + move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1.
-    admit.
+  + by move=> im μ σ pc r r' r1 j LPC rl rpcl l' -> ? [<- <-] upd_r1 /= /negbTE ->.
   (* Call *)
   + move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
-    rewrite /Vector.nth_order /=.
-    admit.
+    by rewrite /= flows_join andbC => /negbTE ->.
   (* BRet *)
   + move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> ? get_r1.
     rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
     case: ifPn=> // Hjoins [<- <-] upd_r1.
     admit.
   (* Alloc *)
-  + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
-    move: (alloc_i); rewrite /alloc.
-    case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
-    rewrite /Vector.nth_order /= => upd_r3.
-    admit.
+  + by move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? _ _ [<- <-] _ _ /= /negbTE ->.
   (* Load *)
   + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
     rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+    by rewrite !flows_join => /negbTE ->.
   (* Store *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
-    rewrite eq_lf in get_fp *.
-    case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp.
-    admit.
+    by move=> _ /negbTE ->.
   (* Write *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (Mem.get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
-    rewrite eq_lf in get_fp *.
-    case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
-    admit.
-(* Jump *)
-+ move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-].
-  admit.
-(* BNZ *)
-+ move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
-  admit.
+    by move=> _ /negbTE ->.
+  (* Jump *)
+  + move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-] /=.
+    by rewrite flows_join => /negbTE ->.
+  (* BNZ *)
+  + move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] /=.
+    by rewrite flows_join andbC => /negbTE ->.
   (* PSetOff *)
-  + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r3.
-    admit.
+  + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-] /=.
+    by move=> _ /negbTE ->.
   (* Put *)
-  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
-    admit.
+  + by move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1 /= /negbTE ->.
   (* BinOp *)
   + move=> im μ σ pc op v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> _ get_r1 get_r2 [<- <-] eval.
-    rewrite /Vector.nth_order /= => upd_r3.
-    admit.
+    by move=> _ /= /negbTE ->.
   (* Nop *)
-  + move=> im μ σ pc r j LPC rpcl -> _ [<-].
-    admit.
+  + by move=> im μ σ pc r j LPC rpcl -> _ [<-] /= /negbTE ->.
   (* MSize *)
-  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p _ /=.
+    by rewrite flows_join => /negbTE ->.
   (* PGetOff *)
-  + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + by move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-] /= _ /negbTE ->.
   (* Mov *)
-  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + by move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-] /= _ /negbTE ->.
 Qed.
 
 End NIProof.
