@@ -7,6 +7,10 @@ Require Import Utils.
 
 Require Import ssreflect ssrbool ssrfun ssrnat eqtype seq.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
 Definition zreplicate {A:Type} (n:Z) (a:A) : option (seq A) :=
   if Z_lt_dec n 0 then None
   else Some (nseq (Z.to_nat n) a).
@@ -76,7 +80,7 @@ Module Type MEM.
 
   Parameter block_eqP : forall S, Equality.axiom (@block_eq S).
 
-  Definition block_eqMixin (S : eqType) := EqMixin (block_eqP S).
+  Definition block_eqMixin (S : eqType) := EqMixin (@block_eqP S).
   Canonical block_eqType (S : eqType) :=
     EqType (block S) (block_eqMixin S).
 
@@ -168,7 +172,7 @@ Module Mem: MEM.
   Lemma block_eqP (S : eqType) : Equality.axiom (@block_eq S).
   Proof. move=> ??; exact/eqP. Qed.
 
-  Definition block_eqMixin (S : eqType) := EqMixin (block_eqP S).
+  Definition block_eqMixin (S : eqType) := EqMixin (@block_eqP S).
   Canonical block_eqType (S : eqType) :=
     EqType (block S) (block_eqMixin S).
 
@@ -329,9 +333,9 @@ Module Mem: MEM.
     unfold upd_frame, upd_frame_rich, get_frame.
     intros.
     generalize (@erefl (option (@frame A S)) (m b)).
-    generalize (upd_frame_rich_obligation_3 A S m b fr').
-    generalize (upd_frame_rich_obligation_2 A S m b fr').
-    generalize (upd_frame_rich_obligation_1 A S m b fr').
+    generalize (@upd_frame_rich_obligation_3 A S m b fr').
+    generalize (@upd_frame_rich_obligation_2 A S m b fr').
+    generalize (@upd_frame_rich_obligation_1 A S m b fr').
     simpl.
     rewrite H. intros. eauto.
   Qed.
@@ -353,9 +357,9 @@ Module Mem: MEM.
     unfold upd_frame, upd_frame_rich, get_frame.
     intros until 0.
     generalize (@erefl (option (@frame A S)) (@content A S m b)).
-    generalize (upd_frame_rich_obligation_3 A S m b fr).
-    generalize (upd_frame_rich_obligation_2 A S m b fr).
-    generalize (upd_frame_rich_obligation_1 A S m b fr).
+    generalize (@upd_frame_rich_obligation_3 A S m b fr).
+    generalize (@upd_frame_rich_obligation_2 A S m b fr).
+    generalize (@upd_frame_rich_obligation_1 A S m b fr).
     simpl.
     intros.
     destruct (m b); eauto; congruence.
@@ -400,7 +404,7 @@ Module Mem: MEM.
   Qed.
 
   Lemma alloc_stamp : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') -> stamp _ b = s.
+    alloc am m s fr = (b,m') -> stamp b = s.
   Proof.
     unfold alloc; intros.
     inv H; auto.
@@ -442,7 +446,7 @@ Module Mem: MEM.
 
   Lemma alloc_local :
     forall A (S : eqType) (m1 m2:t A S) s fr1 fr2,
-      (forall b, stamp _ b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
+      (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
       (alloc Local m1 s fr1).1 = (alloc Local m2 s fr2).1.
   Proof.
     move=> A S [c1 n1 cn1 np1] [c2 n2 cn2 np2] s fr1 fr2.
@@ -521,7 +525,7 @@ Module Mem: MEM.
 
   Lemma get_blocks_spec :
     forall A (S : eqType) (labs : seq S) (mem: t A S) b,
-      (stamp _ b \in labs) && get_frame mem b <->
+      (stamp b \in labs) && get_frame mem b <->
       b \in get_blocks labs mem.
   Proof.
     intros A S labs mem b.

@@ -724,14 +724,14 @@ Proof.
        * symmetry in Heqget.
          apply semBindSize in Hpop.
          case : Hpop => [d' [/semVectorOfSize [Hlen Hforall] Hupd]].
-         destruct (Mem.upd_get_frame _ _ _ _ _ (Fr l d') Heqget)
+         destruct (Mem.upd_get_frame (Fr l d') Heqget)
            as [fr Hupd'].
          rewrite Hupd' in Hupd.
          apply semReturnSize in Hupd.
          inv Hupd. rewrite /mem_constraints.
          destruct (Hinit _ _ _ Heqget) as [? ?].
          subst. move => b' l' d'' Hget.
-         move: (Mem.get_upd_frame _ _ m m'' _ _ Hupd' b') => Hget'.
+         move: (Mem.get_upd_frame Hupd' b') => Hget'.
          case: (b =P b') Hget' => e Hget'.  inv e.
          - rewrite Hget in Hget'. inv Hget'. split => //.
            split; [rewrite Hlen | repeat split => //]; omega.
@@ -753,12 +753,12 @@ Proof.
       * apply IHbs => //. rewrite /mem_single_upd_spec in Hupd.
         case Heqget: (Mem.get_frame m b) Hupd=> [[l d]|] Hupd; try by inv Hupd.
         move : Hupd => [[l' d'] [Hupd' [eq1 [Hlen Hforall]]]]; subst.
-        destruct (Mem.upd_get_frame _ _ _ _ _ (Fr l d') Heqget)
+        destruct (Mem.upd_get_frame (Fr l d') Heqget)
           as [fr Hupd''].
         rewrite Hupd'' in Hupd'. inv Hupd'. rewrite /mem_constraints.
         destruct (Hinit _ _ _ Heqget) as [? ?].
         subst. move => b' l' d'' Hget.
-        move: (Mem.get_upd_frame _ _ m m'' _ _ Hupd'' b') => Hget'.
+        move: (Mem.get_upd_frame Hupd'' b') => Hget'.
         case: (b =P b') Hget' => e Hget'.  inv e.
         - rewrite Hget in Hget'. inv Hget'. split => //.
            split; [rewrite Hlen | repeat split => //]; omega.
@@ -1709,7 +1709,7 @@ split.
   rewrite /handle_single_mframe.
   rewrite Hfr.
   move => /semBindSize [fr' [Hfr' H]].
-  pose proof (Mem.upd_get_frame _ _ m mf fr fr' Hfr) as Hm'.
+  pose proof (Mem.upd_get_frame fr' Hfr) as Hm'.
   move: Hm' => [m'' Hm''].
   rewrite Hm'' in H.
   apply semReturnSize in H.
@@ -1726,13 +1726,13 @@ split.
     split => //=.
     have : (Mem.upd_frame m mf (Fr label0 l0) = Some m') by subst.
     move => Hm.
-    pose proof (Mem.get_upd_frame _ _ m m' mf _ Hm mf') as H.
+    pose proof (Mem.get_upd_frame Hm mf') as H.
     rewrite e eqxx in H.
     by subst.
   - simpl.
     have : (Mem.upd_frame m mf (Fr label0 l0) = Some m') by subst.
     move => Hm.
-    pose proof (Mem.get_upd_frame _ _ m m' mf _ Hm mf') as H.
+    pose proof (Mem.get_upd_frame Hm mf') as H.
     rewrite (negbTE ne) in H.
     by subst.
   rewrite /mem_spec in HmemSpec.
@@ -1754,7 +1754,7 @@ split.
     pose proof (HmemSpec _ _ _ Hfr) as H'.
     by move : H' => [_ [? _]].
   - split => //=.
-    pose proof (Mem.upd_get_frame _ _ m mf fr fr' Hfr) as Hm'.
+    pose proof (Mem.upd_get_frame fr' Hfr) as Hm'.
     move : Hm' => [m'' Hm''].
     rewrite Hm''.
 
@@ -1764,15 +1764,15 @@ split.
       have := H block.
       have [e|ne] := altP (mf =P block).
       + subst.
-        pose proof (Mem.get_upd_frame _ _ _ _ _ _ Hm'' block) as Hyp.
+        pose proof (Mem.get_upd_frame Hm'' block) as Hyp.
         by rewrite Hyp eqxx Hget.
       + pose proof (H block) as Hb.
-        pose proof (Mem.get_upd_frame _ _ _ _ _ _ Hm'' block) as Hyp.
+        pose proof (Mem.get_upd_frame Hm'' block) as Hyp.
         by move: Hb Hyp; rewrite (negbTE ne)=> ? -> ?.
     }
     move => MemExt.
 
-    pose proof (Mem.memory_extensionality m' m'' MemExt).
+    pose proof (Mem.memory_extensionality  MemExt).
     subst.
     by apply semReturnSize.
 Qed.

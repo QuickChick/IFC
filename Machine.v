@@ -285,7 +285,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
 Proof.
   unfold alloc, load; intros.
   destruct (zreplicate size a) eqn:Ez; try congruence; inv H.
-  rewrite (Mem.alloc_get_frame _ _ _ _ _ _ _ _ H1).
+  rewrite (Mem.alloc_get_frame H1).
   case: (mf =P mf')=> ? //=; simpl in *.
   subst.
   simpl.
@@ -304,7 +304,7 @@ Proof.
   destruct (Mem.get_frame m b) eqn:E1; try congruence.
   destruct f as [lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
-  rewrite (Mem.get_upd_frame _ _ _ _ _ _ H).
+  rewrite (Mem.get_upd_frame H).
   have [e|neb //] := (b =P b'); simpl in *.
   subst b'.
   have [?|?] := eqP.

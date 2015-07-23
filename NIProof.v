@@ -236,7 +236,7 @@ Lemma stamp_alloc μ μ' sz lab stamp i li fp :
 Proof.
 rewrite /alloc /zreplicate.
 case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz [alloc_sz].
-by rewrite (Mem.alloc_stamp _ _ _ _ _ _ _ _ alloc_sz).
+by rewrite (Mem.alloc_stamp alloc_sz).
 Qed.
 
 Lemma reachable_alloc_int μ μ' sz lab stamp i li fp l f1 f2 :
@@ -250,7 +250,7 @@ rewrite /link.
 have [<-|neq_fpx] := fp =P x.
   (* How about using implicit arguments? *)
   rewrite (alloc_get_frame_eq _ _ _ _ _ _ alloc_sz) inE /=.
-  rewrite (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ alloc_sz).
+  rewrite (Mem.alloc_get_fresh alloc_sz).
   set s := filter _ _.
   suff /eqP->: s == [::] by rewrite andbF.
   by rewrite -[_ == _]negbK -has_filter has_nseq andbF.
@@ -269,7 +269,7 @@ Proof.
 move=> upd_pv /connectP [p] /(@shortenP _ _ f1) [p'].
 have link_not_pv: forall (f : mframe), pv != f -> link l μ' f =1 link l μ f.
   move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /link.
-  by rewrite (get_frame_upd_frame_neq _ _ _ _ _ _ _ upd_pv neq_pv).
+  by rewrite (get_frame_upd_frame_neq upd_pv neq_pv).
 have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (link l μ') f p = path (link l μ) f p.
   elim=> //= x s IHs f.
   rewrite inE negb_or.
@@ -283,7 +283,7 @@ have [in_path|] := boolP (pv \in f1 :: p').
   rewrite cat_path last_p1 -cat_cons [f1 :: p1]lastI last_p1 cat_uniq last_cat.
   rewrite rcons_uniq.
   case/andP=> path_p1 path_p2 /and3P [/andP [? _] not_pv _] _ /= ->; right.
-  rewrite /= {1}/link (get_frame_upd_frame_eq _ _ _ _ _ _ upd_pv) in path_p2.
+  rewrite /= {1}/link (get_frame_upd_frame_eq upd_pv) in path_p2.
   case/andP: path_p2 => /andP [low_lf ref_f3] path_p2; split=> //; split.
     by apply/connectP; exists p1=> //; rewrite -path_not_pv.
   exists f3; split => //; apply/connectP; exists p2 => //.
@@ -395,7 +395,7 @@ case: {st st'} step.
     case/connectP=> [[_ ->|]] /=.
       by rewrite (stamp_alloc alloc_i) /= joinA low_join low_KK' low_LPC.
     move=> a s.
-    by rewrite /link /= (Mem.alloc_get_fresh _ _ _ _ _ _ _ _ malloc).
+    by rewrite /link /= (Mem.alloc_get_fresh malloc).
   by move: wf_st; rewrite in_stack_f1 orbT; apply.
 (* Load *)
 + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
