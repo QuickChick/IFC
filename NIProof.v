@@ -596,18 +596,14 @@ Proof.
   by eauto.
 Qed.
 
-Lemma indist_registerUpdate_aux obs st1 st2 r v1 v2 :
-  indist obs st1 st2 ->
-  isLow ∂(st_pc st1) obs ->
+Lemma indist_registerUpdate_aux obs rs1 rs2 r v1 v2 :
+  indist obs rs1 rs2 ->
   indist obs v1 v2 ->
-  indist obs (registerUpdate (st_regs st1) r v1) (registerUpdate (st_regs st2) r v2).
+  indist obs (registerUpdate rs1 r v1) (registerUpdate rs2 r v2).
 Proof.
-  move => Hindist Hlow.
-  rewrite (indist_low_pc _ Hlow) in Hindist.
-  case/and5P: Hindist => _ _ _ _.
   rewrite /registerUpdate /update_list_Z.
   case: (BinInt.Z.ltb r 0) => //=.
-  elim: {Hlow st1 st2 r} (BinInt.Z.to_nat r) (st_regs st1) (st_regs st2)
+  elim: {r} (BinInt.Z.to_nat r) rs1 rs2
         => [|n IH] [|x xs] [|y ys] //=.
   - rewrite /indist /= /indist /indistList //= /indist.
     by rewrite eqSS; move => /and3P [-> _ ->] /= ->.
@@ -628,8 +624,10 @@ Lemma indist_registerUpdate obs st1 st2 r v1 v2 regs1 :
     registerUpdate (st_regs st2) r v2 = Some regs2 &
     indist obs regs1 regs2.
 Proof.
-  move => Hindist Hlow Hv1v2 Hupd.
-  move: (indist_registerUpdate_aux r Hindist Hlow Hv1v2).
+  move => Hindist Hlow.
+  move: Hindist.
+  rewrite indist_low_pc // => /and5P [_ _ _ _ Hindist] Hv1v2 Hupd.
+  move: (indist_registerUpdate_aux r Hindist Hv1v2).
   rewrite Hupd.
   case: (registerUpdate (st_regs st2) r v2) => [regs2|] //=.
   by eauto.
@@ -749,9 +747,47 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
     case: ifPn=> // Hjoins [<- <-] upd_r1 low_pc indist_s1s2 wf_s1.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
-    case: s2 wf_s2 indist_s1s2 => [im2 μ2 [[|sf σ2]] regs2 [pcv2 pcl2]] //=.
-    case: sf=> [[jp LPC''] regs2'].
-    admit.
+    case: s2 wf_s2 indist_s1s2 => [im2 μ2 [[|sf σ2]] r2 [j2 LPC2]] //=.
+    case: sf=> [[j2' LPC2'] r2' r12 B2] wf_s2 indist_s1s2.
+    move: indist_s1s2 (indist_s1s2) wf_s2.
+    rewrite {1}indist_low_pc //= {3}/indist /=.
+    case/and5P => [indist_im indist_μ indist_s /eqP [<- <-] {j2 LPC2} indist_r].
+    move: indist_s; rewrite indist_cons {1}/indist /= => /andP [indist_sf indist_s].
+    case get_r12: (registerContent r2 r12) => [[a2 R2]|] //= indist_s1s2 wf_s2.
+    rewrite /run_tmr /apply_rule /= /Vector.nth_order /=.
+    case: ifPn=> // Hjoins2.
+    case upd_r12: (registerUpdate _ _ _)=> [r2''|] //= [<-].
+    rewrite /indist /= indist_im indist_μ /=.
+    move: indist_sf; case: ifPn=> /=.
+      move=> low_pc' ind; move: low_pc' indist_s1s2 get_r12 wf_s2 upd_r12 Hjoins2.
+      case/and4P: ind=> [/eqP [<- <-] indist_r' /eqP <- /eqP <-] {j2' LPC2' r12 B2}.
+      rewrite orbb=> low_pc' indist_s1s2 get_r12.
+      move: (indist_registerContent_aux r1 indist_s1s2 low_pc)=> /=.
+      rewrite get_r1 get_r12 eqxx /= => /andP [/eqP eR indist_a].
+      rewrite -{}eR {R2} in get_r12 *; rewrite {1}/indist /= indist_s /=.
+      move=> wf_s2 upd_r12 _.
+      have [low|hi] := boolP (isLow B obs).
+        move: Hjoins indist_a; rewrite flows_join => /andP [lowR _].
+        rewrite (flows_trans _ _ _ lowR) /= => [indist_a|].
+          have {indist_a} indist_a : indist obs (a @ B) (a2 @ B).
+            by rewrite /indist /= eqxx low.
+          move: (indist_registerUpdate_aux r1 indist_r' indist_a).
+          by rewrite upd_r1 upd_r12.
+        by rewrite flows_join low.
+      have {indist_a} indist_a : indist obs (a @ B) (a2 @ B).
+        by rewrite /indist /= eqxx hi.
+      move: (indist_registerUpdate_aux r1 indist_r' indist_a).
+      by rewrite upd_r1 upd_r12.
+    move=> _ _.
+    elim: σ σ2 indist_s {indist_s1s2 wf_s1 wf_s2}=> [|sf σ IH] [|sf2 σ2] //=.
+    case: sf sf2=> {j' j2' LPC' LPC2' Hjoins Hjoins2 r' r2' upd_r1 upd_r12 r1 r12 get_r1 get_r12}
+                   [[j' LPC'] r' r1 L] [[j2' LPC2'] r2' r12 L2].
+    rewrite indist_cons {1}/indist /=.
+    have [low /= /andP [Hind Hind_s]|/norP [/negbTE -> /negbTE ->] Hind_s] := boolP (isLow _ _ || isLow _ _).
+      case/and4P: Hind low=> [/eqP [<- <-] hr hr1 hL] {LPC2'}.
+      rewrite orbb => low; rewrite low /= indist_cons {1}/indist /= low /= Hind_s andbT.
+      by apply/and4P; split.
+    by auto.
   (* Alloc *)
   + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
     move: (alloc_i); rewrite /alloc.
