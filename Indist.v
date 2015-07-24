@@ -139,6 +139,19 @@ Proof.
 - abstract by move=> obs m1 m2; rewrite andbC.
 Defined.
 
+Lemma indistMemP lab m1 m2 :
+  (forall b, isLow (Mem.stamp b) lab ->
+             Mem.get_frame m1 b || Mem.get_frame m2 b ->
+             indist lab (Mem.get_frame m1 b) (Mem.get_frame m2 b)) ->
+  indist lab m1 m2.
+Proof.
+move=> H; apply/andP; split; apply/allP=> b;
+rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow
+        mem_filter all_elems andbT => /andP [Pb get_b];
+move: (H b Pb); rewrite get_b ?orbT => /(_ erefl)=> //.
+by rewrite indist_sym.
+Qed.
+
 (* Indistinguishability of stack frames (pointwise)
      * The returning pc's must be equal
      * The saved registers must be indistinguishable
