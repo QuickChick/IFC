@@ -1502,7 +1502,7 @@ Proof.
             inv Hforall.
             apply gen_vary_stack_loc_correct in H3 => //=.
             move : H3 => [? H].
-            rewrite /indist /indistStack /stackFrameBelow.
+            rewrite /indist /indistStack.
             destruct loc eqn:Loc; destruct s eqn:S;
             destruct sf_return_addr0 eqn:Ret0;
             destruct sf_return_addr1 eqn:Ret1;

@@ -163,11 +163,6 @@ Proof.
   rewrite orbC (eq_sym ra1) indist_sym (eq_sym rr1) (eq_sym rl1).
 Defined.
 
-Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
-  let 'SF ret_addr  _ _ _ := sf in
-  let 'PAtm _ l_ret_addr := ret_addr in
-  flows l_ret_addr lab.
-
 Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
@@ -188,6 +183,36 @@ Proof.
 - abstract by move => _ ??; exact: eq_sym.
 Defined.
 
+Definition cropTop lab stk :=
+  let lowsf sf :=
+      let: SF (PAtm _ lab') _ _ _ := sf in flows lab' lab in
+  drop (find lowsf stk) stk.
+
+Lemma cropTop_cons lab sf stk :
+  cropTop lab (sf :: stk) =
+  if (let: SF (PAtm _ lab') _ _ _ := sf in flows lab' lab) then
+    sf :: stk
+  else cropTop lab stk.
+Proof.
+case: sf=> [[ra ral] rs rr rl] /=.
+by rewrite /cropTop /=; case: ifP.
+Qed.
+
+Lemma indist_cropTop lab stk1 stk2 :
+  indist lab stk1 stk2 ->
+  indist lab (cropTop lab stk1) (cropTop lab stk2).
+Proof.
+elim: stk1 stk2=> [|[[ra1 ral1] rs1 rr1 rl1] stk1 IH]
+                  [|[[ra2 ral2] rs2 rr2 rl2] stk2] //.
+rewrite indist_cons !cropTop_cons {1}/indist (lock (@indist)) /=.
+have [l /=|/norP [/negbTE -> /negbTE ->]] := boolP (_ || _) => /andP [ind_sf ind_stk].
+  case/and4P: ind_sf (ind_sf) l => [/eqP [<- <-] _ _ _] ind_sf.
+  rewrite orbb => l; rewrite l /=.
+  move: ind_stk; rewrite -!lock indist_cons => ->.
+  by rewrite /= l andbT.
+by move: ind_stk; rewrite -!lock; apply: IH.
+Qed.
+
 Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
@@ -198,11 +223,8 @@ Instance indistState : Indist State :=
               indist lab (st_stack st1) (st_stack st2)
               & indist lab (st_regs st1) (st_regs st2)]
         else
-          let lowsf sf :=
-            let: SF (PAtm _ lab') _ _ _ := sf in flows lab' lab in
-          let cropTop st := drop (find lowsf st) st in
-          indist lab (cropTop (unStack (st_stack st1)))
-                     (cropTop (unStack (st_stack st2))) ]
+          indist lab (cropTop lab (unStack (st_stack st1)))
+                     (cropTop lab (unStack (st_stack st2)))]
 |}.
 
 Proof.
