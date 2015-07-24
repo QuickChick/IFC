@@ -1,4 +1,4 @@
-Require Import String.
+Require Import Coq.Strings.String.
 Require Import Arith.EqNat.
 Require Import ZArith.
 

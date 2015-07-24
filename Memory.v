@@ -1,6 +1,6 @@
 Require Import Datatypes.
 Require Import ZArith.
-Require Import String.
+Require Import Coq.Strings.String.
 Require Import Show.
 
 Require Import Utils.

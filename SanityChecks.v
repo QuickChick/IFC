@@ -11,7 +11,7 @@ Require Import Machine.
 
 Require Import List. Import ListNotations.
 Require Import TestingCommon.
-Require Import String.
+Require Import Coq.Strings.String.
 
 Require Import ssreflect ssrbool eqtype.
 

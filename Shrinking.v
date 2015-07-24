@@ -1,5 +1,5 @@
 Require Import ZArith.
-(*Require Import String.*)
+(*Require Import Coq.Strings.String.*)
 Require Import List. Import ListNotations.
 Require Import NPeano.
 

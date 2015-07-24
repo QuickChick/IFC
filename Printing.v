@@ -1,4 +1,4 @@
-Require Import String.
+Require Import Coq.Strings.String.
 Require Import MSetPositive.
 Require Import ZArith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.

@@ -1,4 +1,4 @@
-Require Import String.
+Require Import Coq.Strings.String.
 Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 Require Import finset path fingraph. (* These depend on Mathematical Components 1.5
                       http://www.msr-inria.fr/projects/mathematical-components-2/ *)
