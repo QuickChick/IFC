@@ -1276,9 +1276,20 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /Vector.nth_order /= => upd_r2.
     admit.
   (* Mov *)
-  + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> _ get_r1 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + move=> im μ σ v K pc rs r' r1 r2 j LPC rl rpcl -> /= CODE get_r1 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2 low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2 low_pc1) /state_instr_lookup /= CODE /=.
+    case: s2 wf_s2 indist_s1s2 => [im2 μ2 σ2 rs2 [j2 LPC2]] wf_s2 indist_s1s2.
+    have /= [[v' K'] -> /andP [/eqP <- indist_v]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    rewrite /Vector.nth_order /=.
+    have indist_vK : indist obs (v@K) (v'@K) by rewrite /indist /= eqxx indist_v.
+    have /= [r2' -> indist_r] /= :=
+      indist_registerUpdate indist_s1s2 low_pc1 indist_vK upd_r2.
+    case: s2' => im2' μ2' σ2' rs2' pc2' [<- <- <- <- <-]; clear im2' μ2' σ2' rs2' pc2'.
+    move: indist_s1s2; rewrite !indist_low_pc //=
+      => /and5P [indist_im indist_μ indist_σ /eqP[<- <-] indist_rs].
+    by apply/and5P.
 - case: step1 high_pc1 high_pc2.
   (* Lab *)
   + move=> im μ σ v K pc r r' r1 r2 j LPC rl rpcl -> /= instr get_r1 [<- <-] upd_r2 high_pc.
