@@ -1147,9 +1147,51 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       => /and5P [indist_im indist_μ indist_σ /eqP[<- <-] indist_r].
     by apply/and5P.
   (* MSize *)
-  + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + move=> im μ σ pc [b off] K C rs r' r1 r2 j LPC rl rpcl n -> /= CODE get_r1 lab_p [<- <-] size_p.
+    rewrite /Vector.nth_order /= => upd_r2 low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2 => [im2 μ2 σ2 rs2 [j2 LPC2]] wf_s2 indist_s1s2.
+    have /= [[v1' K2] -> /andP [/eqP <- indist_v1]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    case: v1' indist_v1 => [] // [b' off'] /= indist_p'.
+    move get_frame_b: (Mem.get_frame μ b) lab_p size_p => [[lab fr]|//] [?] [?]; subst lab n.
+    case get_frame_b': (Mem.get_frame μ2 b') => //= [[C' fr']] /=.
+    rewrite /Vector.nth_order /=.
+    case upd_r2': (registerUpdate rs2 r2 _) => //= [r2'].
+    case: s2' => im2' μ2' σ2' r2'' pc2' [<- <- <- <- <-]; clear im2' μ2' σ2' r2'' pc2'.
+    move: indist_s1s2; rewrite indist_low_pc //=
+      => /and5P [indist_im indist_μ indist_σ /eqP[? ?] indist_rs]; subst j2 LPC2.
+    have [l|h] := boolP (isLow (LPC \_/ K) obs).
+    * rewrite /indist /= l /=; apply/and5P; split=>//.
+      have indist_ints : indist obs (Vint (BinInt.Z.of_nat (Datatypes.length fr))  @ C)
+                                    (Vint (BinInt.Z.of_nat (Datatypes.length fr')) @ C'). {
+        move: l; rewrite flows_join => /andP [low_LPC low_K].
+        move: indist_p' => /orP [h|]; first by move/negP in h.
+        rewrite {1}/indist /= => /eqP [] *; subst b' off'.
+
+        move: indist_μ; rewrite {1}/indist /= /indistMemAsym
+          => /andP [/allP/(_ b) indist_get _].
+        have bsb: b \in blocks_stamped_below obs μ. {
+          rewrite /blocks_stamped_below /allThingsBelow -Mem.get_blocks_spec mem_filter.
+          rewrite get_frame_b all_elems /= !andbT.
+          move: wf_s1; rewrite /well_stamped /well_stamped_label => wf_s1.
+          apply wf_s1 with (f1 := b) => /=.
+          - rewrite in_setU /=; apply/orP; left.
+            by apply (root_set_registers_nth get_r1).
+          - by rewrite /reachable; apply connect0.
+        }
+        move: indist_get => /(_ bsb).
+        rewrite /indist /= /indist /= get_frame_b get_frame_b'
+          => /andP [eq_C /orP [high_C | indist_fr]];
+          apply/andP; split=>//.
+        - by rewrite high_C.
+        - apply/orP; right; apply/eqP; do 2 f_equal.
+          by move: indist_fr; rewrite /indist /= => /andP [/eqP? _].
+      }
+      move: (indist_registerUpdate_aux r2 indist_rs indist_ints).
+      by rewrite {1}/indist /= upd_r2 upd_r2'.
+    * rewrite /indist /= (negbTE h) /=; apply/and3P; split=>//.
+      by apply indist_cropTop.
   (* PGetOff *)
   + move=> im μ σ pc fp' j K r r' r1 r2 j' LPC rl rpcl -> _ get_r1 [<- <-].
     rewrite /Vector.nth_order /= => upd_r2.
