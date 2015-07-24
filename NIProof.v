@@ -1100,9 +1100,21 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       elim: fr fr2 fr' fr2' {i get_fp get_fp' get_r1 get_r1' upd_fp upd_fp'} (BinInt.Z.to_nat i)
             => [|v1 fr1 IH] [|v2' fr2] fr1' fr2' [|i] //=.
         move=> [<-] [<-].
-        admit.
-      admit.
-    admit.
+        rewrite !indist_cons=> /andP [i_v i_fr].
+        apply/andP; split=> //.
+        by rewrite /indist /= eqxx.
+      case upd1: update_list=> [fr1''|] //=.
+      case upd2: update_list=> [fr2''|] //= [<-] [<-].
+      rewrite !indist_cons=> /andP [->] /=.
+      by eauto.
+    case/orP=> [def|def].
+      case/andP: ind_μ=> [/allP/(_ b)].
+      rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow mem_filter low_b all_elems /=.
+      by eauto.
+    case/andP: ind_μ=> [_ /allP/(_ b)].
+    rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow mem_filter low_b all_elems /=.
+    rewrite indist_sym.
+    by eauto.
   (* Write *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
