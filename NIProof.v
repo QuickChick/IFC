@@ -996,23 +996,104 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite eq_lf in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp.
     admit.
-(* Jump *)
-+ move=> im μ σ pc addr Ll r r1 j LPC rpcl -> ? get_r1 [<-].
-  admit.
-(* BNZ *)
-+ move=> im μ σ pc n m K r r1 j LPC rpcl -> ? get_r1 [<-] ?.
-  admit.
+  (* Jump *)
+  + move=> im μ σ pc addr Ll r r1 j LPC rpcl -> /= CODE get_r1 [<-] low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    have /= [[[] // addr2 K2 -> // /andP [/eqP <- indist_i]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    move=> [<-].
+    move: indist_s1s2; rewrite /Vector.nth_order /= indist_low_pc //=.
+    case/and5P=> [? ? ? /eqP [_ ?] ?]; subst LPC2.
+    rewrite /indist /= flows_join low_pc1 /=.
+    case: (boolP (isLow _ _)) indist_i => [low|high _] //=.
+      by move=> /eqP [->]; rewrite eqxx /=; apply/and4P; split.
+    apply/and3P; split=> //.
+    by apply: indist_cropTop.
+  (* BNZ *)
+  + move=> im μ σ pc n m K r r1 j LPC rpcl -> /= CODE get_r1 [<-] low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    have /= [[[] // m2 K2 -> // /andP [/eqP <- indist_i]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    move=> [<-] {s2'}.
+    move: indist_s1s2; rewrite /Vector.nth_order /= indist_low_pc //= => ind.
+    case/and5P: ind wf_s2=> [? ? ? /eqP [<- {j2} ?] ?] wf_s2; subst LPC2.
+    rewrite /indist /= flows_join low_pc1 /=.
+    case: (boolP (isLow _ _)) indist_i => [low|high _] //=.
+      by move=> /eqP [->]; rewrite eqxx /=; apply/and4P; split.
+    apply/and3P; split=> //.
+    by apply: indist_cropTop.
   (* PSetOff *)
-  + move=> im μ σ pc fp' j K1 n K2 r r' r1 r2 r3 j' LPC rl rpcl -> ? get_r1 get_r2 [<- <-].
-    rewrite /Vector.nth_order /= => upd_r3.
-    admit.
+  + move=> im μ σ pc fp' j K1 n K1' r r' r1 r2 r3 j' LPC rl rpcl -> /= CODE get_r1 get_r2 [<- <-].
+    rewrite /Vector.nth_order /= => upd_r3 low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    have /= [[[] // m2 K2 -> // /andP [/eqP <- indist_m]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    case: m2 indist_m => [fp2' j2'] //= indist_p.
+    have /= [[[] // n2 K2' -> // /andP [/eqP <- indist_n]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r2.
+    move: indist_s1s2; rewrite indist_low_pc //= => /and5P [? ? ? /eqP [<- <-] ind_rs].
+    rewrite /Vector.nth_order /=.
+    case upd_r3': registerUpdate=> [r2'|] //= [<-] {s2'}.
+    have [l|h] := boolP (isLow (K1 \_/ K1') obs).
+      move: (l) indist_p indist_n upd_r3'.
+      rewrite flows_join => /andP [-> ->] /= /eqP [<- _] /eqP [<-] {fp2' j2' n2} upd_r3'.
+      rewrite /indist /= low_pc1 /=.
+      apply/and5P; split=> //.
+      have indist_v: indist obs (Vptr (Ptr fp' n) @ K1 \_/ K1') (Vptr (Ptr fp' n) @ K1 \_/ K1').
+        by rewrite indistxx.
+      move: (indist_registerUpdate_aux r3 ind_rs indist_v).
+      by rewrite upd_r3 upd_r3'.
+    rewrite /indist /= low_pc1 /=; apply/and5P; split=> //.
+    have indist_v: indist obs (Vptr (Ptr fp' n) @ K1 \_/ K1') (Vptr (Ptr fp2' n2) @ K1 \_/ K1').
+      by rewrite /indist /= eqxx h.
+    move: (indist_registerUpdate_aux r3 ind_rs indist_v).
+    by rewrite upd_r3 upd_r3'.
   (* Put *)
-  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> ? [<- <-] upd_r1.
-    admit.
+  + move=> im μ σ pc x r r' r1 j LPC rl rpcl -> /= CODE [<- <-] upd_r1 low_pc1.
+    move=> indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    have /= [regs2' -> indist_rs /= [<-]] :=
+      indist_registerUpdate indist_s1s2 low_pc1 (indistxx (Vint x @ ⊥)) upd_r1.
+    move: (indist_pc indist_s1s2 low_pc1)=> /= [??]; subst j2 LPC2.
+    move: indist_s1s2; rewrite indist_low_pc // /= indist_low_pc // /=.
+    by case/and5P=> [?????]; apply/and5P; split=> //.
   (* BinOp *)
-  + move=> im μ σ pc o v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> _ get_r1 get_r2 [<- <-] eval.
+  + move=> im μ σ pc o v1 L1 v2 L2 v r r1 r2 r3 r' j LPC rl rpcl -> /= CODE get_r1 get_r2 [<- <-] eval.
+    rewrite /Vector.nth_order /= => upd_r3 low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    have /= [[v1' K2 -> // /andP [/eqP <- indist_v1]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r1.
+    have /= [[v2' K2' -> // /andP [/eqP <- indist_v2]]] :=
+      indist_registerContent indist_s1s2 low_pc1 get_r2.
+    case eval': eval_binop=> [v'|] //=.
+    rewrite /Vector.nth_order /=.
+    move: indist_s1s2; rewrite indist_low_pc //= => /and5P [? ? ? /eqP [<- <-] ind_rs].
+    case upd_r3': registerUpdate=> [r2'|] //= [<-] {s2'}.
+    have [l|h] := boolP (isLow (L1 \_/ L2) obs).
+      move: (l) indist_v1 indist_v2 eval' upd_r3'.
+      rewrite flows_join => /andP [-> ->] /= /eqP <- /eqP <- {v1' v2'}.
+      rewrite eval => - [<-] upd_r3'.
+      rewrite /indist /= low_pc1 /=.
+      apply/and5P; split=> //.
+      have indist_v : indist obs (v @ L1 \_/ L2) (v @ L1 \_/ L2) by rewrite indistxx.
+      move: (indist_registerUpdate_aux r3 ind_rs indist_v).
+      by rewrite upd_r3 upd_r3'.
+    rewrite /indist /= low_pc1 /=; apply/and5P; split=> //.
+    have indist_v: indist obs (v @ L1 \_/ L2) (v' @ L1 \_/ L2).
+      by rewrite /indist /= eqxx h.
+    move: (indist_registerUpdate_aux r3 ind_rs indist_v).
+    by rewrite upd_r3 upd_r3'.
     rewrite /Vector.nth_order /= => upd_r3.
-    admit.
   (* Nop *)
   + move=> im μ σ pc r j LPC rpcl -> _ [<-].
     admit.
