@@ -21,10 +21,12 @@ Open Scope bool.
 Class Indist (A : Type) : Type := {
   indist : Label -> A -> A -> bool;
 
-  indistxx : forall obs, reflexive (indist obs)
+  indistxx : forall obs, reflexive (indist obs);
+  indist_sym : forall obs, symmetric (indist obs)
 }.
 
 Arguments indistxx {_ _} [obs] _.
+Arguments indist_sym {_ _} [obs] _ _.
 
 Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
 
@@ -37,7 +39,10 @@ Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
 
 }.
 
-Proof. abstract by move => obs [x|//=]; rewrite indistxx. Defined.
+Proof.
+- abstract by move => obs [x|//=]; rewrite indistxx.
+- abstract by move => obs [x|//=] [y|//=]; rewrite indist_sym.
+Defined.
 
 Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
@@ -46,7 +51,9 @@ Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 |}.
 
 Proof.
-  abstract by move => obs; elim => [|x l IH] //=; rewrite indistxx IH.
+- abstract by move => obs; elim => [|x l IH] //=; rewrite indistxx IH.
+- abstract by move => obs; elim => [|x1 l1 IH] [|x2 l2] //=;
+  rewrite !eqSS !(andbC (indist _ _ _)) !andbA IH indist_sym.
 Defined.
 
 Lemma indist_cons {A} `{Indist A} obs x1 l1 x2 l2 :
@@ -63,7 +70,10 @@ Instance indistValue : Indist Value :=
   indist _lab v1 v2 := v1 == v2
 |}.
 
-Proof. abstract by move => _; exact: eqxx. Defined.
+Proof.
+- abstract by move => _; exact: eqxx.
+- abstract by move=> _; exact: eq_sym.
+Defined.
 
 (* Indistinguishability of Atoms.
    - The labels have to be equal (observable labels)
@@ -81,7 +91,11 @@ Instance indistAtom : Indist Atom :=
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
 
-Proof. abstract by move => obs [v l]; rewrite eqxx indistxx orbT. Defined.
+Proof.
+- abstract by move => obs [v l]; rewrite eqxx indistxx orbT.
+- abstract by move=> obs [v1 l1] [v2 l2]; rewrite eq_sym indist_sym;
+  case: eqP=> [->|] //=.
+Defined.
 
 Instance indistFrame : Indist frame :=
 {|
@@ -94,7 +108,9 @@ Instance indistFrame : Indist frame :=
 |}.
 
 Proof.
-  abstract by move => obs [l vs]; rewrite !eqxx indistxx orbT /=.
+- abstract by move => obs [l vs]; rewrite !eqxx indistxx orbT /=.
+- abstract by move=> obs [v1 l1] [v2 l2]; rewrite eq_sym indist_sym;
+  case: eqP=> [->|] //=.
 Defined.
 
 (* Indistinguishability of memories
@@ -118,8 +134,9 @@ Instance indistMem : Indist memory :=
 |}.
 
 Proof.
-abstract by move=> obs m; rewrite andbb /indistMemAsym;
-apply/allP=> b b_in; rewrite indistxx.
+- abstract by move=> obs m; rewrite andbb /indistMemAsym;
+  apply/allP=> b b_in; rewrite indistxx.
+- abstract by move=> obs m1 m2; rewrite andbC.
 Defined.
 
 (* Indistinguishability of stack frames (pointwise)
@@ -141,7 +158,9 @@ Instance indistStackFrame : Indist StackFrame :=
     end
 |}.
 Proof.
-abstract by move=> obs [ra rs rr rl]; rewrite !eqxx indistxx /= implybT.
+- abstract by move=> obs [ra rs rr rl]; rewrite !eqxx indistxx /= implybT.
+- abstract by move=> obs [ra1 rs1 rr1 rl1] [ra2 rs2 rr2 rl2];
+  rewrite orbC (eq_sym ra1) indist_sym (eq_sym rr1) (eq_sym rl1).
 Defined.
 
 Definition stackFrameBelow (lab : Label) (sf : StackFrame) : bool :=
@@ -155,7 +174,8 @@ Instance indistStack : Indist Stack :=
     indist lab (unStack s1) (unStack s2)
 |}.
 Proof.
-abstract by move=> obs s; rewrite indistxx.
+- abstract by move=> obs s; rewrite indistxx.
+- abstract by move=> obs s1 s2; exact: indist_sym.
 Defined.
 
 Instance indistImems : Indist imem :=
@@ -163,7 +183,10 @@ Instance indistImems : Indist imem :=
   indist _lab imem1 imem2 := imem1 == imem2 :> seq (@Instr Label)
 |}.
 
-Proof. abstract by move => _ r; exact: eqxx. Defined.
+Proof.
+- abstract by move => _ r; exact: eqxx.
+- abstract by move => _ ??; exact: eq_sym.
+Defined.
 
 Instance indistState : Indist State :=
 {|
@@ -183,7 +206,11 @@ Instance indistState : Indist State :=
 |}.
 
 Proof.
-abstract by move => obs [imem m stk regs [v l]]; rewrite !indistxx eqxx /=; case: ifP.
+- abstract by move => obs [imem m stk regs [v l]]; rewrite !indistxx eqxx /=; case: ifP.
+- abstract by rewrite (lock (@indist));
+  move=> obs [im1 m1 st1 rs1 [v1 l1]] [im2 m2 st2 rs2 [v2 l2]] /=;
+  rewrite -!lock (indist_sym im1) (indist_sym m1) orbC (eq_sym)
+          (indist_sym st1) (indist_sym rs1) (indist_sym (drop _ _)).
 Defined.
 
 End IndistM.
