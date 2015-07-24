@@ -1193,15 +1193,22 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       apply/andP; split=>//.
       case: (boolP (isLow lf obs)) ind_fr=> //= low_lf.
       move: upd_i upd_i'; rewrite /update_list_Z.
+      move: load_fp load_fp'; rewrite /nth_error_Z.
       case: ifP=> // _.
-      elim: fr fr2 fr' fr2' {v2' i get_fp get_fp' get_r1 get_r1' upd_fp upd_fp' load_fp load_fp'} (BinInt.Z.to_nat i)
-            => [|v1 fr1 IH] [|v2' fr2] fr1' fr2' [|i] //=.
-        move=> [<-] [<-].
+      elim: fr fr2 fr' fr2' {i get_fp get_fp' get_r1 get_r1' upd_fp upd_fp'} (BinInt.Z.to_nat i)
+            => [|v1 fr1 IH] [|v2'' fr2] fr1' fr2' [|i] //=.
+        move=> [->] [->] [<-] [<-].
         rewrite !indist_cons=> /andP [i_v i_fr].
         apply/andP; split=> //.
-        admit.
+        case/andP: i_v => /eqP? i_v; subst lv2'.
+        apply/andP; split=> //.
+        case: (boolP (isLow lv' obs)) i_v => //= low_lv'_obs indist_v'.
+        case/orP: indist_i => [high_lv | //].
+        have low_lf_lv': isLow (lf \_/ lv') obs by rewrite flows_join low_lf.
+        move/negP in high_lv; contradict high_lv.
+        eapply flows_trans; eassumption.
       case upd1: update_list=> [fr1''|] //=.
-      case upd2: update_list=> [fr2''|] //= [<-] [<-].
+      case upd2: update_list=> [fr2''|] //= ? ? [<-] [<-].
       rewrite !indist_cons=> /andP [->] /=.
       by eauto.
     case/orP=> [def|def].
