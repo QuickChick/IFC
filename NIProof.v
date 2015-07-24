@@ -1095,8 +1095,12 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     move: (indist_registerUpdate_aux r3 ind_rs indist_v).
     by rewrite upd_r3 upd_r3'.
   (* Nop *)
-  + move=> im μ σ pc r j LPC rpcl -> _ [<-].
-    admit.
+  + move=> im μ σ pc r j LPC rpcl -> /= CODE [<-] low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2 low_pc1) /state_instr_lookup /= CODE /=.
+    case: s2 wf_s2 indist_s1s2 => [im2 μ2 σ2 rs2 [j2 LPC2]] wf_s2 indist_s1s2 [<-].
+    move: indist_s1s2; rewrite !indist_low_pc //=
+      => /and5P [indist_im indist_μ indist_σ /eqP[<- <-] indist_r].
+    by apply/and5P.
   (* MSize *)
   + move=> im μ σ pc p K C r r' r1 r2 j LPC rl rpcl n -> _ get_r1 lab_p [<- <-] size_p.
     rewrite /Vector.nth_order /= => upd_r2.
