@@ -978,9 +978,54 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     move: (indist_registerUpdate_aux r3 indist_rs indist_dfp).
     by rewrite upd_r3 upd_r32.
   (* Load *)
-  + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> ? get_r1 load_p mlab_p [<- <-].
-    rewrite /Vector.nth_order /= => upd_r2.
-    admit.
+  + move=> im μ σ pc C [pv pl] K r r' r1 r2 j LPC v Ll rl rpcl -> /= CODE get_r1 load_p mlab_p [<- <-].
+    rewrite /Vector.nth_order /= => upd_r2 low_pc1 indist_s1s2 wf_s1.
+    rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
+    case: s2 wf_s2 indist_s1s2
+          => [im2 μ2 σ2 rs2 [j2 LPC2]] //= wf_s2 indist_s1s2.
+    case get_r1': registerContent=> [[[|[pv' pl']|] K']|] //=.
+    have /= [a] := indist_registerContent indist_s1s2 low_pc1 get_r1.
+    rewrite get_r1' => - [<-] {a} /andP [/eqP eK indist_p]; subst K'.
+    case get_pv: (Mem.get_frame μ pv) load_p mlab_p => [[fl fr]|] //= load_p [eC].
+    subst fl.
+    case get_pv': Mem.get_frame=> [[C' fr']|] //=.
+    case load_p': nth_error_Z=> [[v' Ll']|] //=.
+    rewrite /Vector.nth_order /=.
+    case upd_r2': registerUpdate=> [rs2'|] //= [<-] {s2'}.
+    move: indist_s1s2 (indist_s1s2).
+    rewrite {1}indist_low_pc //= => /and5P [? ind_μ ? /eqP [? ?] ind_rs] indist_s1s2; subst j2 LPC2.
+    rewrite /indist /= !flows_join low_pc1 /=.
+    apply/and3P; split=> //.
+    case: (boolP (isLow K obs)) indist_p => [low_K|hi_K _] /=; last first.
+      by apply: indist_cropTop.
+    move=> /eqP [??]; subst pv' pl'.
+    case: ifPn => [low_C|hi_C]; last first.
+      by apply: indist_cropTop.
+    have low_pv: isLow (Mem.stamp pv) obs.
+      apply: (wf_s1 obs pv pv); last by apply: connect0.
+      rewrite /root_set; apply/setUP; left=> /=.
+      rewrite /root_set_registers low_pc1.
+      by apply: (mframes_from_atoms_nth get_r1 low_K).
+    have: indist obs (Mem.get_frame μ pv) (Mem.get_frame μ2 pv).
+      case/orP: low_C=> [low_C|low_C].
+        case/andP: ind_μ => [/allP/(_ pv) ind _]; apply: ind.
+        rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow mem_filter all_elems.
+        by rewrite low_pv get_pv.
+      case/andP: ind_μ => [_ /allP/(_ pv) ind]; rewrite indist_sym; apply: ind.
+      rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow mem_filter all_elems.
+      by rewrite low_pv get_pv'.
+    rewrite get_pv get_pv' {1}/indist /= {1}/indist /= => /andP [/eqP ?]; subst C'.
+    rewrite orbb in low_C; rewrite low_C /= => ind_fr.
+    apply/and3P; split=> //.
+    have ind_v: indist obs (v @ Ll) (v' @ Ll').
+      move: ind_fr load_p load_p'.
+      rewrite /nth_error_Z; case: BinInt.Z.ltb => //.
+      elim: fr fr' (BinInt.Z.to_nat pl) {get_pv get_pv'}
+            => [|a fr IH] [|a' fr'] //= [|n] //=.
+        by rewrite indist_cons => /andP [??] [<-] [<-].
+      by rewrite indist_cons => /andP [? /IH]; apply.
+    move: (indist_registerUpdate_aux r2 ind_rs ind_v).
+    by rewrite upd_r2 upd_r2'.
   (* Store *)
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
