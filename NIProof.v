@@ -8,6 +8,7 @@ Require Import Utils Labels Rules Memory Instructions Machine Indist NotionsOfNI
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+Set Bullet Behavior "Strict Subproofs".
 
 Module NIProof (Lattice : FINLAT).
 
@@ -677,8 +678,8 @@ case/fstepP.
 - move=> im μ σ pc B K r r1 r2 r3 j La addr Lpc rl rpcl -> ? get_r1 get_r2 [<- <-].
   by rewrite /= flows_join andbC => /negbTE ->.
 (* BRet *)
-move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> /= CODE get_r1.
-by rewrite /state_instr_lookup /=.
+- move=> im μ σ pc a r r' r'' r1 R pc' B j j' LPC LPC' rl rpcl -> -> /= CODE get_r1.
+  by rewrite /state_instr_lookup /=.
 (* Alloc *)
 - by move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? _ _ [<- <-] _ _ /= /negbTE ->.
 (* Load *)
@@ -1093,7 +1094,6 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       by rewrite /indist /= eqxx h.
     move: (indist_registerUpdate_aux r3 ind_rs indist_v).
     by rewrite upd_r3 upd_r3'.
-    rewrite /Vector.nth_order /= => upd_r3.
   (* Nop *)
   + move=> im μ σ pc r j LPC rpcl -> _ [<-].
     admit.
