@@ -647,6 +647,17 @@ Proof.
 by apply/eqP/eqP=> [[? ->]|[-> ->] //]; congr PAtm; omega.
 Qed.
 
+Lemma indist_pcl obs st1 st2 :
+  indist obs st1 st2 ->
+  isLow ∂(st_pc st1) obs = isLow ∂(st_pc st2) obs.
+Proof.
+case/and3P=> [_ _].
+have [low1|high1] := boolP (isLow _ _)=> /=.
+  by case/and4P=> [/eqP <-]; rewrite low1.
+have [low2|high2] := boolP (isLow _ _)=> //=.
+by case/and4P=> [/eqP e _ _ _]; move: high1; rewrite e low2.
+Qed.
+
 Lemma high_low obs s s' :
   fstep default_table s = Some s' ->
   isHigh ∂(st_pc s)  obs ->
@@ -1099,11 +1110,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /Vector.nth_order /= => upd_r2.
     admit.
 - move/fstepP in step1.
-  have high_pc2: isHigh ∂(st_pc s2) o.
-    move: indist_s1s2; rewrite /indist /= (negbTE high_pc1) /=.
-    have [l|//] := boolP (isLow ∂(st_pc s2) o).
-    case/and5P => [_ _ /eqP e _ _].
-    by move: high_pc1; rewrite e l.
+  have high_pc2: isHigh ∂(st_pc s2) o by rewrite -(indist_pcl indist_s1s2).
   move=> step2.
   move: (high_low step1 high_pc1 low_pc1') (high_low step2 high_pc2 low_pc2') => i1 i2.
   move: step1 step2; rewrite /fstep i1 i2 /=.
