@@ -1158,9 +1158,47 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
           move: hi_lf hi_lf2 ind_fr.
           rewrite !flows_join.
           case: (boolP (isLow lf obs))=> [low_lf|hi_lf] //= hi_lv' hi_lv2'.
-          move: upd_i upd_i'.
-          rewrite /update_list_Z.
-          admit.
+          move: upd_i upd_i' load_fp load_fp'.
+          rewrite /update_list_Z /nth_error_Z.
+          case: ifP=> //= _.
+          case: ifP=> //= _.
+          { elim: fr fr2 fr' fr2' {get_fp get_fp' upd_fp upd_fp' i pl' get_r1 get_r1'}
+                  (BinInt.Z.to_nat i) (BinInt.Z.to_nat pl')
+                  => [|[v1 lv1] fr1 IH] [|[v2'' lv2''] fr2] fr1' fr2' [|n1] [|n2] //=.
+          * move=> [<-] [<-] [-> ->] [-> ->].
+            rewrite !indist_cons => /andP [ind ->]; rewrite andbT.
+            case/andP: ind=> [/eqP ?]; subst lv2'.
+            by rewrite /indist /= hi_lv2' eqxx.
+          * move=> [<-].
+            case upd: update_list=> [fr2''|] //= [<-] [-> ->] n.
+            rewrite !indist_cons.
+            case/andP=> [/andP [/eqP ?]]; subst lv2''.
+            rewrite {3}/indist /= eqxx hi_lv' /= => _.
+            elim: fr2 fr1 fr2'' n2 upd n {v1 lv1 IH}=> [|v2''' fr2 IH] [|[v1 lv1] fr1] fr2'' [|n2] //=.
+              move=> [<-] [->].
+              rewrite !indist_cons=> /andP [ind ->]; rewrite andbT.
+              move: ind; rewrite /indist /= => /andP [/eqP ?]; subst lv2'.
+              by rewrite eqxx hi_lv2'.
+            case upd: update_list=> [fr2'''|] //= [<-] Hn.
+            rewrite !indist_cons => /andP [->] /=.
+            by apply: IH upd Hn.
+          * case upd: update_list=> [fr1''|] //= [<-] [<-] Hn [-> ->].
+            rewrite !indist_cons.
+            case/andP=> [/andP [/eqP ?]]; subst lv2'.
+            rewrite {3}/indist /= eqxx hi_lv2' /= => _.
+            elim: fr1 fr2 fr1'' n1 upd Hn {v1 v2 indist_i get_r2 get_r2' IH}=>
+                  [|v1 fr1 IH] [|[v2 lv2] fr2] fr1'' [|n2] //=.
+              move=> [<-] [->].
+              rewrite !indist_cons=> /andP [ind ->]; rewrite andbT.
+              move: ind; rewrite /indist /= => /andP [/eqP ?]; subst lv'.
+              by rewrite eqxx hi_lv'.
+            case upd: update_list=> [fr2'''|] //= [<-] Hn.
+            rewrite !indist_cons => /andP [->] /=.
+            by apply: IH upd Hn.
+          * case upd1: update_list=> [fr1''|] //= [<-].
+            case upd2: update_list=> [fr2''|] //= [<-] nth1 nth2.
+            rewrite !indist_cons => /andP [->] /=.
+            by eauto. }
         case/andP: ind_μ => [/allP/(_ fp) H _].
         move: H.
         rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow mem_filter low_b all_elems /=.
