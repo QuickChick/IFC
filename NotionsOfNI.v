@@ -1,4 +1,4 @@
-Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
+From mathcomp Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
 
 Set Implicit Arguments.
 

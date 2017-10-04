@@ -3,11 +3,11 @@ Require Import MSetPositive.
 Require Import ZArith.
 Require Import Coq.Numbers.Natural.Peano.NPeano.
 
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 
 Require Import TestingCommon.
 
-Require Import ssreflect eqtype seq.
+From mathcomp Require Import ssreflect eqtype seq.
 Import LabelEqType.
 
 (* High-level note:

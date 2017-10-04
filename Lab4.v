@@ -1,5 +1,5 @@
 Require Import Labels.
-Require Import ssreflect ssrfun ssrbool eqtype seq.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 (** The four point finite lattice (diamond shape) *)
 Inductive Lab4 : Set :=

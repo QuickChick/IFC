@@ -1,5 +1,4 @@
-Require Import QuickChick.
-Import GenLow GenHigh.
+From QuickChick Require Import QuickChick.
 
 Require Import Reachability.
 Require Import Printing.
@@ -13,7 +12,7 @@ Require Import List. Import ListNotations.
 Require Import TestingCommon.
 Require Import Coq.Strings.String.
 
-Require Import ssreflect ssrbool eqtype.
+From mathcomp Require Import ssreflect ssrbool eqtype.
 
 Local Open Scope string.
 

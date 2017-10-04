@@ -1,6 +1,6 @@
 Require Import ZArith.
 
-Require Import ssreflect ssrbool eqtype seq.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Utils.
 

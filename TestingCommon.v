@@ -2,8 +2,7 @@ Require Import ZArith.
 Require Import Coq.Strings.String.
 Require Import NPeano.
 
-Require Import QuickChick.
-Import GenLow GenHigh.
+From QuickChick Require Import QuickChick.
 
 Require Export Utils.
 Require Export Labels.

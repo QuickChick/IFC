@@ -1,3 +1,6 @@
+-R . IFC
+compcert/lib/Coqlib.v
+compcert/lib/Integers.v
 Instructions.v
 Labels.v
 Lab2.v
@@ -24,6 +27,3 @@ GenerationProofs.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
 #Driver.v -- run `make tests` for this
--I compcert/lib
-compcert/lib/Coqlib.v
-compcert/lib/Integers.v

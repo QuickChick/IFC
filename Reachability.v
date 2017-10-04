@@ -1,6 +1,6 @@
 Require Import ZArith.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
 Require Import TestingCommon.
 

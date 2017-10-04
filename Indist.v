@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Instructions.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
 Require Import Utils Labels Memory Machine.
 (*Require Import Common.*)

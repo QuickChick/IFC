@@ -1,5 +1,5 @@
 Require Import Labels.
-Require Import ssreflect ssrbool ssrfun eqtype seq.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 (** The two point finite lattice *)
 Inductive Lab2 : Set :=

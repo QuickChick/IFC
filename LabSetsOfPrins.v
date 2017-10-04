@@ -512,7 +512,7 @@ Definition label_of_list (l : list Z) :=
 Definition allThingsBelow (l : Label) :=
   map label_of_list (powerset (Zset.elements l)).
 
-Require Import ssreflect ssrbool.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Lemma incl_empty : forall s, Zset.incl Zset.empty s.
 Proof.

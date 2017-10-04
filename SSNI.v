@@ -2,8 +2,7 @@ Require Import Coq.Strings.String.
 Require Import Arith.EqNat.
 Require Import ZArith.
 
-Require Import QuickChick.
-Import GenLow GenHigh.
+From QuickChick Require Import QuickChick.
 
 Require Import TestingCommon.
 Require Import Printing.
@@ -11,8 +10,6 @@ Require Import Shrinking.
 Require Import Generation.
 
 Open Scope string_scope.
-
-Require Import Show.
 
 Require Import Reachability.
 

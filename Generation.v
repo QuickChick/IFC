@@ -1,11 +1,10 @@
-Require Import QuickChick.
-Import GenLow GenHigh.
+From QuickChick Require Import QuickChick.
 
 Require Import TestingCommon.
 
 Require Import ZArith.
 
-Require Import ssreflect eqtype seq.
+From mathcomp Require Import ssreflect eqtype seq.
 Import LabelEqType.
 
 (* ------------------------------------------------------ *)
@@ -607,11 +606,16 @@ Definition gen_variation_state : G (@Variation State) :=
     | _ => returnGen (Var bot failed_state failed_state)
   end).
 
-Instance arbBinOpT : Arbitrary BinOpT :=
+Instance genBinOpT : Gen BinOpT :=
 {|
   arbitrary := @gen_BinOpT;
+|}.
+
+Instance shrBinOpT : Shrink BinOpT :=
+{|
   shrink o  := match o with
                | BAdd => [::]
                | _ => [:: BAdd]
                end
 |}.
+

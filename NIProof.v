@@ -1,9 +1,11 @@
 Require Import Coq.Strings.String.
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
-Require Import finset path fingraph. (* These depend on Mathematical Components 1.5
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
+From mathcomp Require Import finset path fingraph. (* These depend on Mathematical Components 1.5
                       http://www.msr-inria.fr/projects/mathematical-components-2/ *)
 
 Require Import Utils Labels Rules Memory Instructions Machine Indist NotionsOfNI.
+
+Require Import Omega. 
 
 Set Implicit Arguments.
 Unset Strict Implicit.

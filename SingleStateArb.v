@@ -1,5 +1,4 @@
-Require Import QuickChick.
-Import GenLow GenHigh.
+From QuickChick Require Import QuickChick.
 
 Require Import Machine.
 
@@ -21,10 +20,13 @@ Definition genState : G State :=
   let '(Var _ st _) := v in
   returnGen st).
 
-Instance arbState : Arbitrary State :=
+Instance gState : Gen State :=
 {|
-  arbitrary := @genState ;
-  shrink x :=
+  arbitrary := @genState 
+|}.
+
+Instance shrState : Shrink State :=
+{| shrink x :=
     let all := shrinkVState (Var top x x) in
     let state_of_var v := let '(Var _ x _) := v in x in
     filter (indist top x) (map state_of_var all)

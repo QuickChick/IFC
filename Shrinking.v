@@ -3,7 +3,7 @@ Require Import ZArith.
 Require Import List. Import ListNotations.
 Require Import NPeano.
 
-Require Import QuickChick.
+From QuickChick Require Import QuickChick.
 
 Require Import TestingCommon. Import Mem.
 Require Import Indist.
@@ -131,7 +131,7 @@ Fixpoint shrink_datas (lab : Label) (ds ds' : list Atom) :=
     | _, _ => nil
   end.
 
-Definition shrinkListAtom := shrinkList shrinkAtom.
+Definition shrinkListAtom := shrinkListAux shrinkAtom.
 
 (* Probably need to revisit this *)
 Instance shrVFrame : ShrinkV frame :=
