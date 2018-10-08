@@ -268,14 +268,12 @@ Lemma gen_value_correct:
     semGenSize (gen_value inf) size <--> val_spec.
 Proof.
   rewrite /gen_value /val_spec.
-  
-  remember inf as Inf.
-  clear data_len_nonempty.
-  clear code_len_correct.
-  clear data_len_positive.
-  clear no_regs_positive.
-  case : inf HeqInf => def clen dlen reg HeqInf.
-  case; rewrite HeqInf.
+
+  pose proof gen_int_correct as Int.
+  pose proof gen_pointer_correct as Pointer.
+
+  case : inf Int Pointer => def clen dlen reg Int Pointer.
+  case.
   + { (* VInt *)
     Opaque gen_int.
     move => z.
@@ -287,17 +285,16 @@ Proof.
       apply semLiftGenSize in H2;
       move: H2 => [? [H1 H2]];
       case: H2 => // <-.
-
-      by apply gen_int_correct in H1.
+      by apply Int.
     - move => ZSpec.
       apply semFrequencySize => /=.
       eexists; split.
       * by left.
       * simpl. apply semLiftGenSize.
         exists z; split => //.
-          by apply gen_int_correct.
+        by apply Int. 
     } 
-  + (* Vptr *)
+  + { (* Vptr *)
     Opaque gen_pointer valid_pointer.
     case => mf addr.
     split.
@@ -307,14 +304,15 @@ Proof.
       apply semLiftGenSize in H2;
       move: H2 => [? [H1 H2]];
       case: H2 => // <-.
-      by apply gen_pointer_correct in H1.
+      by apply Pointer in H1.
     - move => ZSpec.
       apply semFrequencySize => /=.
       eexists; split.
       * by right; left.
       * simpl. apply semLiftGenSize.
         exists (Ptr mf addr); split => //.
-        by apply gen_pointer_correct.
+          by apply Pointer.
+    }
    + (* Vlab *)
      move => L. split => // _.
      apply semFrequencySize => /=.
@@ -324,7 +322,7 @@ Proof.
        eexists; split => //.
        by apply gen_label_correct.
 Qed.
-*)
+
 (* Atom *)
 
 Definition atom_spec atm  :=
@@ -425,13 +423,15 @@ Proof.
   Opaque smart_gen_stack_loc.
   rewrite /smart_gen_stack /stack_spec. move => st.
   split.
-  (*
-  + move/semFrequencySize => /= [[freq g] [H1 /= H2]].
+  + {
+    move/semFrequencySize => /= [[freq g] [H1 /= H2]].
     case: H1 => [[] * | [[] * | //]]; subst.
     - apply semReturnSize in H2. by left; case H2.
     - move: H2 => /semBindSize [sf [/gen_stack_loc_correct H1 /semReturnSize H2]].
       right; exists sf; split => /= //.
-  + move => [StNil | [sf [H1 H2]]]; subst; apply semFrequencySize => /=.
+    } 
+  + {
+    move => [StNil | [sf [H1 H2]]]; subst; apply semFrequencySize => /=.
     - eexists; split => /= //.
       * by left.
       * by apply semReturnSize.
@@ -441,8 +441,8 @@ Proof.
         exists sf; split => /= //.
         + by apply gen_stack_loc_correct.
         + by apply semReturnSize.
-Qed.*)
-  Admitted.
+    } 
+Qed.
 
 (* frame *)
 
@@ -1149,8 +1149,6 @@ Proof.
   + (* la higher than observable state *)
     split.
     * (* Correctness *)
-Admitted.
-(*
       move => /semFrequencySize /=.
       case: va Hspec=> [i | ptr | lv];  case: va' => [i' | ptr' | lv'];
       move => Hpec [[freq g] [Hgen Hret]];
@@ -1188,7 +1186,7 @@ Admitted.
       - apply semReturnSize; by move: (flows_antisymm _ _ H2 H1) => Heq; subst.
       - by apply gen_value_correct.
       - apply semReturnSize; by move: (flows_antisymm _ _ H2 H1) => Heq; subst.
-Qed.*)
+Qed.
 
 (* Vary Ptr_atom *)
 Lemma gen_vary_pc_correct:
@@ -1310,7 +1308,7 @@ exists reg; split => //=.
 by apply/seq_InP.
 Qed.
 
-  Opaque indist join flows gen_vary_atom.
+Opaque join flows gen_vary_atom.
 Lemma gen_vary_stack_loc_correct : forall obs loc,
    (stack_loc_spec loc) ->
    semGenSize (gen_vary_stack_loc obs inf loc) size <-->
@@ -1347,9 +1345,7 @@ split; simpl.
       rewrite /atom_spec.
       destruct reg' eqn:Reg'.
       by move: Hsem => [_ Hspec].
-Admitted.
-(*    - rewrite /indist /= orbb !eqxx /= !andbT Flows.
-      rewrite /indist /indistList.
+    - rewrite /indist /= !eqxx /= !andbT.
       rewrite !size_length Hlen -!size_length size_map eqxx /=.
       apply/allP=> - [/= reg reg'] HIn.
       have H : List.In (reg', gen_vary_atom obs inf reg)
@@ -1433,7 +1429,7 @@ Admitted.
         destruct reg' eqn:Reg'.
         * split => //=.
           subst.
-          rewrite /indist /= Flows /= in Hindist.
+          rewrite /indist /= /= in Hindist.
           case/and4P: Hindist => [? Hindist ? ?].
           rewrite /indist /indistList in Hindist.
           move:  Hindist => /andP [? /allP H].
@@ -1443,7 +1439,7 @@ Admitted.
         * move/seq_InP in HIn1. by apply Hregs' in HIn1.
     }
     - apply semReturnSize.
-      rewrite /indist /= Flows /= in Hindist.
+      rewrite /indist /= /= in Hindist.
       case/and4P: Hindist => [/eqP Heq1 Hindist /eqP Heq2 /eqP Heq3]; subst.
       by inv Heq1.
   }
@@ -1466,7 +1462,7 @@ Admitted.
    - by apply gen_from_nat_length_correct.
    by apply semReturnSize.
 Qed.
-*)
+
 Lemma gen_vary_stack_correct :
   forall (st : Stack) obs,
     stack_spec st ->
@@ -1514,8 +1510,6 @@ Proof.
             inv Hforall.
             apply gen_vary_stack_loc_correct in H3 => //=.
             move : H3 => [? H].
-Admitted.
-(*
             rewrite /indist /indistStack.
             destruct loc eqn:Loc; destruct s eqn:S;
             destruct sf_return_addr0 eqn:Ret0;
@@ -1523,12 +1517,12 @@ Admitted.
             simpl in *.
             destruct (isLow l obs) eqn:Flows.
             - { (* l <: obs *)
-              rewrite /indist /= Flows /= in H.
+              rewrite /indist /= /= in H.
               move/and4P: H => [/eqP Heq1 Hindist /eqP Heq3 /eqP Heq4]; subst.
               inv Heq1.
-              by rewrite /indist /= /indist /= Flows /= !andbT !eqxx !andbT.
+              by rewrite /indist /= /indist /= /= !andbT !eqxx !andbT.
               }
-            - by rewrite /indist /= /indist /= Flows (negbTE H) /=.
+            - by rewrite /indist /= /indist /= (negbTE H) /=.
           }
           + rewrite /stack_spec. right.
             exists s; split => //=.
@@ -1544,7 +1538,7 @@ Admitted.
     + move => [Hindist [Hspec' Hlen]].
       rewrite /gen_vary_stack /gen_vary_low_stack.
       apply semLiftGenSize.
-      case: st' Hindist Hspec' Hlen=> [[|loc' [|]]] //= /andP [_ /= /andP [Hindist _]].
+      case: st' Hindist Hspec' Hlen=> [[|loc' [|]]] //= /andP [Hindist _].
       case=> [|[loc'' [[<-] {loc''} Hspec']]] // _.
       exists [:: loc']; split => //=; apply semSequenceGenSize; split => //=.
       constructor => //=; apply gen_vary_stack_loc_correct => //; split => //.
@@ -1556,7 +1550,7 @@ Admitted.
       apply/negP=> l_pcl'; case/andP: (H l_pcl') => [/eqP [??] _]; subst pcl'.
       by rewrite hi_pcl in l_pcl'.
 Qed.
-*)
+
 (* Vary Memory *)
 
 Definition frame_spec (fr : frame) :=
