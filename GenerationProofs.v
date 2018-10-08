@@ -105,10 +105,9 @@ Proof.
   + move => /semElementsSize H.
     destruct obs; destruct l; auto;
     simpl in H;
-    try by move: H => [? | [ ? | [ ? | ?]]];
-    try by move: H => [? | [ ? | ?]];
-                        inv H.
-    (*
+    try move: H => [? | [ ? | [ ? | ?]]];
+    try move: H => [? | [ ? | ?]];
+    try congruence; try by (exfalso; eauto).
   + move => H.
     apply semElementsSize.
     destruct obs; destruct l; auto;
@@ -121,8 +120,6 @@ Proof.
     - by left.
     - by right; left.
 Qed.
-     *)
-    Admitted.
 
 Section WithDataLenNonEmpty.
 
@@ -216,10 +213,11 @@ Definition int_spec (z : Z) : Prop :=
 
 Lemma gen_int_correct :
   semGenSize (gen_int inf) size <--> int_spec.
-  (*
+Proof.
 move => z.
 split. 
-+ move => /semFrequencySize /= [[freq g] [H1 H2]].
++ {
+  move => /semFrequencySize /= [[freq g] [H1 H2]].
   case: H1 => [[] * | [[] * | [[] * | //]]]; subst.
   - move: H2 => /arbInt_correct [? ?].
     split; [ omega | ].
@@ -233,8 +231,10 @@ split.
     apply H in code_len_correct.
     split; [ omega | ];
     eapply (Z.le_trans _ (code_len inf - 1) _); [ omega | ].
-    by apply Z.le_max_r.
-+ move => [ZMin ZMax].
+      by apply Z.le_max_r.
+  }
++ {
+  move => [ZMin ZMax].
   apply semFrequencySize => /=.
   case (Z_lt_le_dec z 0) => ZLt0.
   - eexists; split.
@@ -252,11 +252,10 @@ split.
       eexists; split.
       + by left.
       + apply arbInt_correct; omega.
+  }
 Qed.
-   *)
-Admitted.
-(* Value *)
 
+(* Value *)
 Definition val_spec (v : Value) : Prop :=
   match v with
     | Vint n => int_spec n
@@ -269,19 +268,18 @@ Lemma gen_value_correct:
     semGenSize (gen_value inf) size <--> val_spec.
 Proof.
   rewrite /gen_value /val_spec.
+  
   remember inf as Inf.
   clear data_len_nonempty.
   clear code_len_correct.
   clear data_len_positive.
   clear no_regs_positive.
-  case : Inf HeqInf => def clen dlen reg HeqInf.
+  case : inf HeqInf => def clen dlen reg HeqInf.
   case; rewrite HeqInf.
-  + (* VInt *)
+  + { (* VInt *)
     Opaque gen_int.
     move => z.
     split => //.
-    Admitted.
-(*
     - move => /semFrequencySize /=.
       move => [[freq g] [H1 /= H2]].
 
@@ -289,6 +287,7 @@ Proof.
       apply semLiftGenSize in H2;
       move: H2 => [? [H1 H2]];
       case: H2 => // <-.
+
       by apply gen_int_correct in H1.
     - move => ZSpec.
       apply semFrequencySize => /=.
@@ -296,7 +295,8 @@ Proof.
       * by left.
       * simpl. apply semLiftGenSize.
         exists z; split => //.
-        by apply gen_int_correct.
+          by apply gen_int_correct.
+    } 
   + (* Vptr *)
     Opaque gen_pointer valid_pointer.
     case => mf addr.
