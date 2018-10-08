@@ -1566,14 +1566,13 @@ Lemma gen_vary_frame_correct :
      let 'Fr _ data := fr in
      let 'Fr _ data' := fr' in
      length data <= length data' <= (length data) + 1).
+(*
 Proof.
   move => obs [label data] HforallIn
               [label' data'].
-  Opaque indist join flows gen_vary_atom.
+  Opaque join flows gen_vary_atom.
   split.
-Admitted.
-(*
-  { rewrite /gen_var_frame /indist /indistFrame.
+  { rewrite /gen_var_frame /indistFrame.
       destruct (isLow label obs) eqn:Flows'.
       { (* label <: obs *)
         simpl in *.
@@ -1599,7 +1598,8 @@ Admitted.
           rewrite !eqxx /=; split; last split.
           - rewrite /indist /indistList.
             rewrite !size_length Hlen eqxx /=.
-            by apply/allP=> - [a1 a2] /seq_InP /Hindist_spec [].
+            case (isLow label' obs) => //=.
+            by apply/allP => - [a1 a2] /seq_InP /Hindist_spec []. 
           - move => [v2 l2] HIn2.
             move : (HIn2) => HIn2'. apply List.in_split in HIn2'.
             move : HIn2' => [data'_pre [data'_post Heq]].
@@ -1639,7 +1639,11 @@ Admitted.
           simpl in Hle3, Hle4.
           repeat (split => //; try apply/andP); (try by rewrite addn1);
           try by apply flows_refl.
-          by move => a /Hforall/gen_atom_correct Hin. }
+          case (isLow label' obs) => //=.
+          apply/andP; split.
+          + rewrite !size_length.
+            c
+              by move => a /Hforall/gen_atom_correct Hin. }
     }
   { rewrite /indist /indistFrame /frame_spec /gen_var_frame.
     - move=> [/andP [/eqP H1 H2] [H3 H4]].
@@ -1689,7 +1693,8 @@ Admitted.
         }
       }
 Qed.
-*)
+ *)
+Admitted.
 
 Definition mem_spec (m : memory) :=
   forall mf l data,
