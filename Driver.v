@@ -41,8 +41,8 @@ Instance mutateable_table : Mutateable table :=
   mutate := mutate_table
 |}.
 
-Definition testMutantX_ n :=
-  propSSNI (nth n (mutate_table default_table) default_table).
+Definition testMutantX_ p n : :=
+  p (nth n (mutate_table default_table) default_table).
 
 QuickChick (testMutantX_ 0).
 FuzzChick (testMutantX_ 0).

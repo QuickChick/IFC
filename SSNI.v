@@ -4,6 +4,7 @@ Require Import ZArith.
 
 From QuickChick Require Import QuickChick.
 
+Require Import Machine.
 Require Import TestingCommon.
 Require Import Printing.
 Require Import Shrinking.
@@ -15,74 +16,66 @@ Require Import Reachability.
 
 Definition is_low_state st lab := isLow (pc_lab (st_pc st)) lab.
 
-Definition propSSNI_helper (t : table) (v : Variation) : Checker  :=
+Record exp_result := MkExpResult { exp_success : Checker
+                                 ; exp_fail    : Checker
+                                 ; exp_reject  : Checker
+                                 ; exp_check   : bool -> Checker
+                                 }.
+
+(* HACK: To get statistics on successful runs/discards/avg test failures, we can 
+   assume everything succeeds and collect the result. *)
+Definition exp_result_random : exp_result :=
+  {| exp_success := collect true  true
+   ; exp_fail    := collect false true
+   ; exp_reject  := collect "()"  true
+   ; exp_check   := (fun b => collect b true)
+  |}.
+
+(* For fuzzing, we let afl-fuzz gather the statistics (and hack afl-fuzz instead :) *)
+Definition exp_result_fuzz : exp_result :=
+  {| exp_success := collect true  true
+   ; exp_fail    := collect false false
+   ; exp_reject  := collect "()"  tt
+   ; exp_check   := (fun b => collect b b)
+  |}.
+
+Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Checker  :=
     let '(Var lab st1 st2) := v in
-    (*  Checker.trace (Show.show lab ++ Show.nl ++
-     showStatePair lab frameMap1 frameMap2 st1 st2) *)
-    collect (option_bind opcode_of_instr
-                         (instr_lookup (st_imem st1) (st_pc st1)))
+    if indist lab st1 st2 then
+      (* XXX Our generator should always give us this by design.
+         If that's not the case the generator is broken. *)
+      match fstep t st1  with
+      | Some st1' =>
+        if is_low_state st1 lab then
+          match fstep t st2 with
+          | Some st2' =>
+             exp_check res (indist lab st1' st2')
+          | _ => exp_reject res
+          (* XXX This used to fail the checker in ICFP paper.
+             But here it does happen for Alloc, Store and BRet *)
+          end
+        else (* is_high st1 *)
+          if is_low_state st1' lab then
+            match fstep t st2 with
+            | Some st2' =>
+              if is_low_state st2' lab then
+                exp_check res (indist lab st1' st2') 
+              else exp_success res
+            | _ => exp_success res
+            end
+          else
+            exp_check res (indist lab st1 st1')
+      | _ => exp_success res
+      end
+    else exp_reject res.
 
-    (* collect (show lab) *)
-            (if indist lab st1 st2 then
-               (* XXX Our generator should always give us this by design.
-                  If that's not the case the generator is broken. *)
-               match fstep t st1  with
-                 | Some st1' =>
-                   if is_low_state st1 lab then
-                     match fstep t st2 with
-                       | Some st2' =>
-                         collect "LOW -> *" (
-(*
-                                   whenFail
-                                     ("LOW -> *" ++ nl ++
-                                                 (show_execution lab [st1; st1'] [st2; st2']))
-*)
-                                     (indist lab st1' st2')(*:Gen QProp*))
-                       | _ => (* 1 took a low step and 2 failed *)
-                         collect "Second failed" (checker true)
-                     (*
-                ((Checker.trace (show_pair lab st1 st1'))
-                (checker false))
-                      *)
-                     (* XXX This used to fail the checker in ICFP paper.
-                  But here it does happen for Alloc, Store and BRet *)
-                     end
-                   else (* is_high st1 *)
-                     if is_low_state st1' lab then
-                       match fstep t st2 with
-                         | Some st2' =>
-                           if is_low_state st2' lab then
-                             collect "HIGH -> LOW" (
-(*
-                                       whenFail ("HIGH -> LOW" ++ Show.nl ++
-                                                                (show_execution lab [st1; st1'] [st2; st2']))
-*)
-                                                 (indist lab st1' st2') (* : Gen QProp *)
-                                     )
-                           else collect "Second not low" (checker true)
-                         (* This can happen; it's just a discard *)
-                         (* TODO: could check that st2' `indist` st1 *)
-                         | _ => collect "Second failed H" (checker true)
-                       (* This can happen; it's just a discard *)
-                       end
-                     else
-                       collect "HIGH -> HIGH" (
-(*
-                                 whenFail ("HIGH -> HIGH" ++ Show.nl ++
-                                                          (show_pair lab st1 st1'))
-*)
-                                       (indist lab st1 st1')
-                               (*: Gen QProp*))
-                 | _ => collect "Failed" (checker true)
-               (* This can happen; it's just a discard *)
-               (* TODO: could check if st2 does a H -> H step *)
-               end
-             else collect "Not indist!" (checker true)).
-           (* XXX this should never happen with a correct generator;
-              and prop_generate_indist already tests this;
-              so this should either go away or become (propery false) *)
-
-  Definition propSSNI t : Checker :=
+  Definition propSSNI_smart r t : Checker :=
     forAllShrinkShow gen_variation_state (fun _ => nil) (fun _ => ""%string)
       (* shrinkVState *)
-      (propSSNI_helper t).
+      (fun v => propSSNI_helper t v r).
+
+  Definition propSSNI_arb r t : Checker :=
+    forAllShrinkShow arbitrary (fun _ => nil) (fun _ => ""%string)
+      (fun v => propSSNI_helper t v r).
+
+                     

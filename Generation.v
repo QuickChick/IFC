@@ -560,7 +560,6 @@ Definition populate_memory inf (m : memory) : G memory :=
   let all_frames := [seq fst p | p <- data_len inf] in
   foldGen (populate_frame inf) all_frames m.
 
-
 (* FIX this to instantiate stamps to a non-trivially well-formed state *)
 Definition instantiate_stamps (st : State) : State := st.
 
@@ -618,4 +617,61 @@ Instance shrBinOpT : Shrink BinOpT :=
                | _ => [:: BAdd]
                end
 |}.
+
+
+
+(* Arbitrary version *)
+  Derive GenSized for Lab4.
+
+  Derive GenSized for Instr.
+
+  Derive GenSized for Pointer.
+  Derive GenSized for Value.
+  Derive GenSized for Atom.
+
+Fixpoint arb_init_mem_helper (n : nat) (ml : memory * list (mframe * Z)) :=
+  match n with
+    | O    => returnGen ml
+    | S n' =>
+      let (m, l) := ml in
+      bindGen arbitrary (fun frame_size =>
+      bindGen arbitrary (fun lab =>
+         match (alloc frame_size lab bot (Vint Z0 @ bot) m) with
+           | Some (mf, m') =>
+             arb_init_mem_helper n' (m', cons (mf,frame_size) l)
+           | None => arb_init_mem_helper n' ml
+         end))
+  end.
+
+Definition arb_init_mem : G (memory * list (mframe * Z)):=
+  bindGen arbitrary (fun no_frames =>
+  arb_init_mem_helper no_frames (Mem.empty Atom Label, nil)).
+
+Definition arb_frame (m : memory) (mf : mframe) : G memory :=
+  match Mem.get_frame m mf with
+    | Some (Fr lab data) =>
+      bindGen (vectorOf (List.length data) (arbitrary)) (fun data' =>
+      match Mem.upd_frame m mf (Fr lab data') with
+        | Some m' => returnGen m'
+        | _ => pure m
+      end)
+    | _ => pure m
+  end.
+
+Definition arb_memory : G memory :=
+  bindGen arb_init_mem (fun ml =>
+  let (m, l) := ml in                           
+  let all_frames := [seq fst p | p <- l] in
+  foldGen (arb_frame) all_frames m).
+
+Instance GenSizedmemory : GenSized memory :=
+  {| arbitrarySized := fun _ => arb_memory |}.
+
+Derive GenSized for Ptr_atom.
+Derive GenSized for StackFrame.
+Derive GenSized for Stack.
+
+Derive GenSized for State.
+Derive GenSized for Variation.
+
 

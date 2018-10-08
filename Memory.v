@@ -2,7 +2,7 @@ Require Import Datatypes.
 Require Import ZArith.
 Require Import Coq.Strings.String.
 
-From QuickChick Require Import Show.
+From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Utils.
@@ -91,7 +91,8 @@ Module Type MEM.
 
  (* For printing *)
   Declare Instance show_block : forall {S} {_: Show S}, Show (block S).
-
+  Declare Instance gen_block : forall {S} `{GenSized S}, GenSized (block S).
+  
   (* DD -> DP : is a block some kind of "stamped pointer"? *)
   Parameter get_frame : forall {A S}, t A S -> block S -> option (@frame A S).
   Parameter upd_frame :
@@ -219,6 +220,12 @@ Module Mem: MEM.
       let (z,s) := (b : block S) in
       ("(" ++ show z ++ " @ " ++ show s ++ ")")%string
   |}.
+
+  Instance gen_block {S} `{GenSized S} : GenSized (block S) :=
+    {|
+      arbitrarySized := fun n => liftGen2 pair (arbitrarySized n) (arbitrarySized n)
+    |}.
+
 
   Program Definition map {A B S} (f:@frame A S -> @frame B S) (m:t A S) : t B S:=
     MEM
