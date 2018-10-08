@@ -53,18 +53,18 @@ Class SmartGen (A : Type) := {
 }.
 
 Definition gen_BinOpT : G BinOpT :=
-  elements BAdd [:: BAdd; BMult; BJoin; BFlowsTo; BEq].
+  elems_ BAdd [:: BAdd; BMult; BJoin; BFlowsTo; BEq].
 
 (* Labels *)
 
 Definition gen_label : G Label :=
-  elements bot elems.
+  elems_ bot elems.
 
 Definition gen_label_between_lax (l1 l2 : Label) : G Label :=
-  elements l2 (filter (fun l => isLow l1 l) (allThingsBelow l2)).
+  elems_ l2 (filter (fun l => isLow l1 l) (allThingsBelow l2)).
 
 Definition gen_label_between_strict (l1 l2 : Label) : G Label :=
-  elements l2 (filter (fun l => isLow l1 l && negb (eqtype.eq_op l l1))%bool
+  elems_ l2 (filter (fun l => isLow l1 l && negb (eqtype.eq_op l l1))%bool
                       (allThingsBelow l2)).
 
 Instance smart_gen_label : SmartGen Label :=
@@ -73,12 +73,12 @@ Instance smart_gen_label : SmartGen Label :=
 |}.
 
 Definition gen_high_label (obs : Label) : G Label :=
-  elements H (filter (fun l => negb (isLow l obs)) (allThingsBelow H)).
+  elems_ H (filter (fun l => negb (isLow l obs)) (allThingsBelow H)).
 
 (* Pointers *)
 Definition gen_pointer (inf : Info) : G Pointer :=
     let '(MkInfo def _ dfs _) := inf in
-    bindGen (elements (def, Z0) dfs) (fun mfl =>
+    bindGen (elems_ (def, Z0) dfs) (fun mfl =>
     let (mf, len) := mfl in
     bindGen (gen_from_length len) (fun addr =>
     returnGen (Ptr mf addr))).
@@ -90,7 +90,7 @@ Instance smart_gen_pointer : SmartGen Pointer :=
 
 (* Ints *)
 Definition gen_int (inf : Info) : G Z :=
-  frequency (pure Z0)
+  freq_ (pure Z0)
             [:: (10, arbitrary);
                 (1 , pure Z0);
                 (10, gen_from_length (code_len inf))].
@@ -104,7 +104,7 @@ Instance smart_gen_int : SmartGen Z :=
 
 Definition gen_value (inf : Info) : G Value :=
   let '(MkInfo def cl dfs _) := inf in
-    frequency (liftGen Vint arbitrary)
+    freq_ (liftGen Vint arbitrary)
               [:: (1, liftGen Vint  (smart_gen inf));
                       (* prefering 0 over other integers (because of BNZ);
                          prefering valid code pointers over invalid ones *)
@@ -163,7 +163,7 @@ Definition smart_gen_stack_loc inf : G StackFrame :=
 (* Make sure the stack invariant is preserved
  - no need since we only create one *)(* CH: probably wrong *)
 Definition smart_gen_stack inf : G Stack :=
-  frequency (pure (ST nil))
+  freq_ (pure (ST nil))
             [:: (1, pure (ST nil));
                 (9, bindGen (smart_gen_stack_loc inf) (fun sl =>
                     returnGen (ST [:: sl])))].
@@ -204,7 +204,7 @@ Definition ainstrSSNI (st : State) : G Instr :=
   let '(dptr, cptr, num, lab) :=
       groupRegisters st regs [::] [::] [::] [::] Z0 in
   let genRegPtr := gen_from_length (Zlength regs) in
-  frequency (pure Nop) [::
+  freq_ (pure Nop) [::
     (* Nop *)
     (1, pure Nop);
     (* Halt *)
@@ -214,42 +214,42 @@ Definition ainstrSSNI (st : State) : G Instr :=
     (* Lab *)
     (10, liftGen2 Lab genRegPtr genRegPtr);
     (* MLab *)
-    (onNonEmpty dptr 10, liftGen2 MLab (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 10, liftGen2 MLab (elems_ Z0 dptr) genRegPtr);
     (* PutLab *)
     (10, liftGen2 PutLab gen_label genRegPtr);
     (* BCall *)
     (10 * onNonEmpty cptr 1 * onNonEmpty lab 1,
-     liftGen3 BCall (elements Z0 cptr) (elements Z0 lab) genRegPtr);
+     liftGen3 BCall (elems_ Z0 cptr) (elems_ Z0 lab) genRegPtr);
     (* BRet *)
     (if negb (emptyList (unStack stk)) then 50 else 0, pure BRet);
     (* Alloc *)
     (200 * onNonEmpty num 1 * onNonEmpty lab 1,
-     liftGen3 Alloc (elements Z0 num) (elements Z0 lab) genRegPtr);
+     liftGen3 Alloc (elems_ Z0 num) (elems_ Z0 lab) genRegPtr);
     (* Load *)
-    (onNonEmpty dptr 10, liftGen2 Load (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 10, liftGen2 Load (elems_ Z0 dptr) genRegPtr);
     (* Store *)
-    (onNonEmpty dptr 100, liftGen2 Store (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 100, liftGen2 Store (elems_ Z0 dptr) genRegPtr);
     (* Write *)
-    (onNonEmpty dptr 100, liftGen2 Write (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 100, liftGen2 Write (elems_ Z0 dptr) genRegPtr);
     (* Jump *)
-    (onNonEmpty cptr 10, liftGen Jump (elements Z0 cptr));
+    (onNonEmpty cptr 10, liftGen Jump (elems_ Z0 cptr));
     (* BNZ *)
     (onNonEmpty num 10,
       liftGen2 BNZ (choose (Zminus (0%Z) (1%Z), 2%Z))
-                   (elements Z0 num));
+                   (elems_ Z0 num));
     (* PSetOff *)
     (10 * onNonEmpty dptr 1 * onNonEmpty num 1,
-     liftGen3 PSetOff (elements Z0 dptr) (elements Z0 num) genRegPtr);
+     liftGen3 PSetOff (elems_ Z0 dptr) (elems_ Z0 num) genRegPtr);
     (* Put *)
     (10, liftGen2 Put arbitrary genRegPtr);
     (* BinOp *)
     (onNonEmpty num 10,
-     liftGen4 BinOp gen_BinOpT (elements Z0 num)
-              (elements Z0 num) genRegPtr);
+     liftGen4 BinOp gen_BinOpT (elems_ Z0 num)
+              (elems_ Z0 num) genRegPtr);
     (* MSize *)
-    (onNonEmpty dptr 10, liftGen2 MSize (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 10, liftGen2 MSize (elems_ Z0 dptr) genRegPtr);
     (* PGetOff *)
-    (onNonEmpty dptr 10, liftGen2 PGetOff (elements Z0 dptr) genRegPtr);
+    (onNonEmpty dptr 10, liftGen2 PGetOff (elems_ Z0 dptr) genRegPtr);
     (* Mov *)
     (10, liftGen2 Mov genRegPtr genRegPtr)
 ].
@@ -296,7 +296,7 @@ Definition gen_vary_atom (obs: Label) (inf : Info) (a : Atom) : G Atom :=
   let '(v @ l) := a in
   if flows l obs then returnGen a
   else
-    frequency (returnGen a)
+    freq_ (returnGen a)
       [:: (1, bindGen (gen_value inf) (fun v => returnGen (v @ l)))
       ;(9, match v with
              | Vint  _ =>

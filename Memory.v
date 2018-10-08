@@ -197,6 +197,7 @@ Module Mem: MEM.
 
   Definition get_frame {A S} (m:t A S) := content m.
 
+  (* Only used in QuickChick proofs *)
   Definition memory_extensionality {A} {S : eqType} (m1 m2 : t A S)
              (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
     admit.
@@ -337,6 +338,12 @@ Module Mem: MEM.
     generalize (@upd_frame_rich_obligation_2 A S m b fr').
     generalize (@upd_frame_rich_obligation_1 A S m b fr').
     simpl.
+(*    move => HI ? HA Eq.
+    symmetry in H.
+    pose proof (HI fr H) as Hyp1.
+    pose proof (HA fr H) as Hyp2.
+    symmetry in H.
+*)  
     (* rewrite H. intros. eauto. *)
   Admitted.
 

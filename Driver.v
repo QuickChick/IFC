@@ -3,19 +3,19 @@ Require Import ZArith.
 Require Import Coq.Strings.String.
 Require Import List. Import ListNotations.
 
-Require Import QuickChick.
-Require Import Show.
-Require Import Test.
+Set Warnings "-extraction-reserved-identifier".
 
-Require Import Rules.
-Require Import TestingCommon.
-Require Import Generation.
-Require Import Shrinking.
-Require Import SSNI.
-Require Import Reachability.
-Require Import SingleStateArb.
+From QuickChick Require Import QuickChick.
 
-Require Import SanityChecks.
+Require Import IFC.Rules.
+Require Import IFC.TestingCommon.
+Require Import IFC.Generation.
+Require Import IFC.Shrinking.
+Require Import IFC.SSNI.
+Require Import IFC.Reachability.
+Require Import IFC.SingleStateArb.
+
+Require Import IFC.SanityChecks.
 
 (* Testing well-formedness first *)
 
@@ -34,12 +34,18 @@ QuickCheck (propSSNI default_table).
 (* Testing mutants third *)
 
 Require Import Mutate.
-Require Import MutateCheck.
+From QuickChick Require Import MutateCheck.
 
 Instance mutateable_table : Mutateable table :=
 {|
   mutate := mutate_table
 |}.
+
+Definition testMutantX_ n :=
+  propSSNI (nth n (mutate_table default_table) default_table).
+
+QuickChick (testMutantX_ 0).
+FuzzChick (testMutantX_ 0).
 (*
 Eval simpl in (nth 24 (mutate_table default_table) default_table).
 *)
@@ -57,6 +63,8 @@ Definition testMutantX x y :=
   let mutant := fun o' =>
     (helper x y o' (default_table o'))  in
   testSSNI mutant.
+
+FuzzChick
 
 Definition testMutant7 := testMutantX
   OpBCall (≪TRUE, JOIN Lab2 LabPC, Lab1 ≫).

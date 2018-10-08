@@ -7,7 +7,7 @@ Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
 
 tests:
-	coqc Driver.v
+	coqc -R . IFC Driver.v
 
 clean:
          # This might not work on macs, but then not my problem

@@ -86,12 +86,15 @@ Inductive Value : Type :=
   | Vptr  (p:Pointer)
   | Vlab  (l:Label).
 
+Instance jsl_lab : JoinSemiLattice Label.
+  apply FLat.
+Defined.
+
 Definition val_eq (v1 v2 : Value) : bool :=
   match v1, v2 with
     | Vint  i1, Vint i2  => i1 == i2
     | Vlab  l1, Vlab l2  => l1 == l2
-    | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) =>
-      (mf1 == mf2) && (i1 == i2)
+    | Vptr (Ptr mf1 i1), Vptr (Ptr mf2 i2) => (mf1 == mf2) && (i1 == i2)
     | _, _ => false
   end.
 

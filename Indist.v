@@ -119,6 +119,7 @@ Defined.
    - Get all pairs that have been allocated in low contexts.
 *)
 
+Existing Instance FLat.
 Definition blocks_stamped_below (lab : Label) (m : memory) : seq mframe :=
   Mem.get_blocks (allThingsBelow lab) m.
 

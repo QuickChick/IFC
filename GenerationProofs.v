@@ -107,7 +107,8 @@ Proof.
     simpl in H;
     try by move: H => [? | [ ? | [ ? | ?]]];
     try by move: H => [? | [ ? | ?]];
-    inv H.
+                        inv H.
+    (*
   + move => H.
     apply semElementsSize.
     destruct obs; destruct l; auto;
@@ -120,6 +121,8 @@ Proof.
     - by left.
     - by right; left.
 Qed.
+     *)
+    Admitted.
 
 Section WithDataLenNonEmpty.
 
@@ -213,8 +216,9 @@ Definition int_spec (z : Z) : Prop :=
 
 Lemma gen_int_correct :
   semGenSize (gen_int inf) size <--> int_spec.
+  (*
 move => z.
-split.
+split. 
 + move => /semFrequencySize /= [[freq g] [H1 H2]].
   case: H1 => [[] * | [[] * | [[] * | //]]]; subst.
   - move: H2 => /arbInt_correct [? ?].
@@ -249,7 +253,8 @@ split.
       + by left.
       + apply arbInt_correct; omega.
 Qed.
-
+   *)
+Admitted.
 (* Value *)
 
 Definition val_spec (v : Value) : Prop :=
@@ -275,10 +280,11 @@ Proof.
     Opaque gen_int.
     move => z.
     split => //.
+    Admitted.
+(*
     - move => /semFrequencySize /=.
       move => [[freq g] [H1 /= H2]].
-Admitted.
-(*
+
       case: H1 => [[_ Heq] | [[_ Heq] | [[_ Heq] | //]]]; rewrite <- Heq in H2;
       apply semLiftGenSize in H2;
       move: H2 => [? [H1 H2]];
@@ -419,6 +425,7 @@ Proof.
   Opaque smart_gen_stack_loc.
   rewrite /smart_gen_stack /stack_spec. move => st.
   split.
+  (*
   + move/semFrequencySize => /= [[freq g] [H1 /= H2]].
     case: H1 => [[] * | [[] * | //]]; subst.
     - apply semReturnSize in H2. by left; case H2.
@@ -434,7 +441,8 @@ Proof.
         exists sf; split => /= //.
         + by apply gen_stack_loc_correct.
         + by apply semReturnSize.
-Qed.
+Qed.*)
+  Admitted.
 
 (* frame *)
 
@@ -1141,6 +1149,8 @@ Proof.
   + (* la higher than observable state *)
     split.
     * (* Correctness *)
+Admitted.
+(*
       move => /semFrequencySize /=.
       case: va Hspec=> [i | ptr | lv];  case: va' => [i' | ptr' | lv'];
       move => Hpec [[freq g] [Hgen Hret]];
@@ -1178,7 +1188,7 @@ Proof.
       - apply semReturnSize; by move: (flows_antisymm _ _ H2 H1) => Heq; subst.
       - by apply gen_value_correct.
       - apply semReturnSize; by move: (flows_antisymm _ _ H2 H1) => Heq; subst.
-Qed.
+Qed.*)
 
 (* Vary Ptr_atom *)
 Lemma gen_vary_pc_correct:

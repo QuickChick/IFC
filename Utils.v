@@ -319,6 +319,33 @@ Error: Cannot guess decreasing argument of fix. *)
 Require Import Omega.
 Require Import Recdef.
 
+
+Ltac arith_hypo_ssrnat2coqnat :=
+  match goal with
+    | H : context [andb _ _] |- _ => let H0 := fresh in case/andP: H => H H0
+    | H : context [orb _ _] |- _ => case/orP: H => H
+    | H : context [?L <= ?R] |- _ => move/leP: H => H
+    | H : context [?L < ?R] |- _ => move/ltP : H => H
+    | H : context [?L = ?R] |- _ => move/eqP : H => H
+    | H : context [addn ?L ?R] |- _ => rewrite -plusE in H
+    | H : context [muln ?L ?R] |- _ => rewrite -multE in H
+    | H : context [subn ?L ?R] |- _ => rewrite -minusE in H
+  end.
+
+Ltac arith_goal_ssrnat2coqnat :=
+  rewrite ?NatTrec.trecE -?plusE -?minusE -?multE -?leqNgt -?ltnNge;
+  repeat match goal with
+    | |- is_true (andb _ _) => apply/andP; split
+    | |- is_true (orb _ _) => try apply/orP
+    | |- is_true (_ <= _) => try apply/leP
+    | |- is_true (_ < _) => try apply/ltP
+  end.
+
+Ltac ssromega :=
+  repeat arith_hypo_ssrnat2coqnat;
+  arith_goal_ssrnat2coqnat; simpl;
+  omega.
+
 Definition span' X (p : X -> bool) : forall (xs : list X),
     {x : list X * list X | le (length (snd x)) (length xs)}.
   refine(
@@ -552,7 +579,8 @@ Proof.
      inv H.  simpl. constructor.
      inv H.
      pose proof (IHn _ _ H). simpl.
-Admitted. (* Why does omega not work? *)
+     ssromega.
+Qed.
 
 Lemma nth_error_Z_valid (T:Type): forall i (l:list T) v,
    nth_error_Z l i = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.
@@ -679,9 +707,9 @@ Proof.
   - inv H.
   - destruct n.
     + simpl.  eauto.
-    + simpl. edestruct IHl as [l' E]. simpl in H. instantiate (1:= n). admit.
+    + simpl. edestruct IHl as [l' E]. simpl in H. instantiate (1:= n). ssromega.
       eexists. rewrite E. eauto.
-Admitted.
+Qed.
 
 Lemma valid_update :
   forall T i (l : list T) x x',
@@ -986,10 +1014,9 @@ Lemma drop_cons : forall {X:Type} p (l : list X),
     exists x,
       drop p l = x :: drop (S p) l.
 Proof.
-move=> X; elim=> [|p IH] [|x l] H; simpl in *; try omega; eauto.
-(*   by rewrite drop0; eauto.
-apply IH; omega.*)
-Admitted.
+move=> X; elim=> [|p IH] [|x l] H; simpl in *; try ssromega; eauto.
+by rewrite drop0; eauto.
+Qed.
 
 Lemma dropZ_all: forall {X:Type} (xs:list X),
   (dropZ (Z.of_nat (size xs)) xs = [::]).
@@ -1011,15 +1038,15 @@ Lemma dropZ_nil :
     (i >= Z.of_nat (size l))%Z.
 Proof.
   intros.
-  destruct (Z_lt_dec i (Z.of_nat (size l))) as [H|]; try omega.
+  destruct (Z_lt_dec i (Z.of_nat (size l))) as [H|]; try omega; try ssromega.
   unfold dropZ in *.
-  destruct (Z.ltb_spec0 i 0); try omega.
-  rewrite -> Z2Nat.inj_lt in H; try omega.
+  destruct (Z.ltb_spec0 i 0); try ssromega.
+  rewrite -> Z2Nat.inj_lt in H; try ssromega.
   rewrite Nat2Z.id in H.
-(*  apply drop_cons in H.
-  destruct H.
-  congruence. *)
-Admitted.
+  pose proof (drop_cons (Z.to_nat i) l) as Hyp.
+  destruct Hyp; try ssromega.
+  congruence. 
+Qed.
 
 Lemma nth_error_drop_zero :
   forall X (i : nat) (l : list X),
