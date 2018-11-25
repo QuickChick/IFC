@@ -23,7 +23,7 @@ Shrinking.v
 SingleStateArb.v
 SSNI.v
 GenerationProofsHelpers.v
-GenerationProofs.v
+#GenerationProofs.v
 #SSNICheckerProofs.v
 NotionsOfNI.v
 #Driver.v -- run `make tests` for this

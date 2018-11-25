@@ -23,9 +23,6 @@ Definition testMutantX_ p n : Checker :=
   p (nth n (mutate_table default_table) default_table).
 
 Definition rSSNI_smart := propSSNI_smart exp_result_random.
-Definition fSSNI_smart := propSSNI_smart exp_result_fuzz.
-Definition rSSNI_naive := propSSNI_arb   exp_result_random.
-Definition fSSNI_naive := propSSNI_arb   exp_result_fuzz.
+Definition rSSNI_enum  := propSSNI_enum  exp_result_random.
 
-QuickChick (testMutantX_ rSSNI_naive 0).
-FuzzChick (testMutantX_ 0).
+Extract Constant defNumTests => "100000".

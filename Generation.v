@@ -260,6 +260,91 @@ Definition instantiate_instructions st : G State :=
   let im' := nseq (length im) instr in
   returnGen (St im' m s r pc)).
 
+(* This should become a combinator... *)
+Definition oneOf_enum {A : Type} (def: G A) (gs : list (G A)) : G A :=
+  bindGen (enumR (0, length gs - 1)) (fun i => nth def gs i).
+
+Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
+  match l with
+  | nil => nil
+  | cons (Some x) l => cons x (cat_maybes l)
+  | cons None     l => cat_maybes l
+  end.
+
+Definition cons_ne {A B : Type} (l : list A) (x : B) (xs : list B) :=
+  match l with
+    | nil => xs
+    | _   => cons x xs
+  end.
+
+Definition cons_ne' {A B : Type} (l1 l2 : list A) (x : B) (xs : list B) :=
+  match l1,l2 with
+    | nil,nil => xs
+    | _,_  => cons x xs
+  end.
+
+Definition ainstrSSNI_enum (st : State) : G Instr :=
+  let '(St im m stk regs pc ) := st in
+  let '(dptr, cptr, num, lab) :=
+      groupRegisters st regs [::] [::] [::] [::] Z0 in
+  let genRegPtr := gen_from_length (Zlength regs) in
+  let instr_gen_options := 
+    cons (liftGen PcLab genRegPtr) (
+    (* Lab *)
+    cons (liftGen2 Lab genRegPtr genRegPtr) (
+    (* MLab *)
+    cons_ne dptr (liftGen2 MLab (elems_ Z0 dptr) genRegPtr) (
+    (* PutLab *)
+    cons (liftGen2 PutLab gen_label genRegPtr) (
+    (* BCall *)
+    cons_ne' cptr lab 
+             (liftGen3 BCall (elems_ Z0 cptr) (elems_ Z0 lab) genRegPtr) (
+    (* BRet *)
+    cons_ne (unStack stk) (pure BRet) (
+    (* Alloc *)
+    cons_ne' num lab
+             (liftGen3 Alloc (elems_ Z0 num) (elems_ Z0 lab) genRegPtr) (
+    (* Load *)
+    cons_ne dptr (liftGen2 Load (elems_ Z0 dptr) genRegPtr) (
+    (* Store *)
+    cons_ne dptr (liftGen2 Store (elems_ Z0 dptr) genRegPtr) (
+    (* Write *)
+    cons_ne dptr (liftGen2 Write (elems_ Z0 dptr) genRegPtr) (
+    (* Jump *)
+    cons_ne cptr (liftGen Jump (elems_ Z0 cptr)) (
+    (* BNZ *)
+    cons_ne num 
+            (liftGen2 BNZ (choose (Zminus (0%Z) (1%Z), 2%Z))
+                      (elems_ Z0 num)) (
+    (* PSetOff *)
+    cons_ne' dptr num 
+             (liftGen3 PSetOff (elems_ Z0 dptr) (elems_ Z0 num) genRegPtr) (
+    (* Put *)
+    cons (liftGen2 Put arbitrary genRegPtr) (
+    (* BinOp *)
+    cons_ne num 
+            (liftGen4 BinOp gen_BinOpT (elems_ Z0 num)
+                      (elems_ Z0 num) genRegPtr) (
+    (* MSize *)
+    cons_ne dptr (liftGen2 MSize (elems_ Z0 dptr) genRegPtr) (
+    (* PGetOff *)
+    cons_ne dptr (liftGen2 PGetOff (elems_ Z0 dptr) genRegPtr) (
+    (* Mov *)
+    cons (liftGen2 Mov genRegPtr genRegPtr)
+    nil ))))))))))))))))) in
+   (* Generate Nop some small percent of the time *)
+  freq_ (pure Nop) [::
+    (* Nop *)
+    (1 , pure Nop);
+    (19, oneOf_enum (pure Nop) (instr_gen_options))].
+
+
+Definition enum_instructions st : G State :=
+  let '(St im m s r pc) := st in
+  bindGen (ainstrSSNI_enum st) (fun instr =>
+  let im' := nseq (length im) instr in
+  returnGen (St im' m s r pc)).
+
 (* ------------------------------------------------------ *)
 (* -------- Variations ----- ---------------------------- *)
 (* ------------------------------------------------------ *)
@@ -605,6 +690,44 @@ Definition gen_variation_state : G (@Variation State) :=
     | _ => returnGen (Var bot failed_state failed_state)
   end).
 
+Definition copy_imem (st st' : State) : State :=
+  let '(St _ m s r p) := st' in St (st_imem st) m s r p.
+  
+(* Generate an initial state. Instruction opcodes enumerated at the end to save effort.
+   TODO : Currently stamps are trivially well formed (all bottom) *)
+Definition gen_variation_state_enum : G (@Variation State) :=
+  (* Generate basic machine *)
+  (* Generate initial memory and dfs *)
+  bindGen gen_init_mem (fun init_mem_info =>
+  let (init_mem, dfs) := init_mem_info in
+  (* Generate initial instruction list *)
+  let imem := nseq (C.code_len) Nop in
+  (* Create initial info - if this fails, fail the generation *)
+  match dfs with
+    | (def, _) :: _ =>
+      let inf := MkInfo def (Z.of_nat C.code_len) dfs C.no_registers in
+      (* Generate pc, registers and stack - all pointer stamps are bottom *)
+      bindGen (smart_gen inf) (fun pc =>
+      bindGen (smart_gen inf) (fun regs =>
+      bindGen (smart_gen_stack inf) (fun stk =>
+      (* Populate the memory - still all stamps are bottom *)
+      bindGen (populate_memory inf init_mem) (fun m =>
+      (* Instantiate instructions *)
+      let st := St imem m stk regs pc in
+      (* Instantiate stamps *)
+      let st := instantiate_stamps st in
+      (* Create Variation *)
+      (* bindGen (gen_label_between_lax (get_stack_label stk) prins) (fun obs => *)
+      bindGen (gen_label_between_lax bot top) (fun obs =>
+      bindGen (smart_vary obs inf st) (fun st' =>
+      bindGen (enum_instructions st) (fun st =>
+      let st' := copy_imem st st' in                                               
+      returnGen (Var obs st st'))))))))
+    | _ => returnGen (Var bot failed_state failed_state)
+  end).
+
+(* Arbitrary version *)
+
 Instance genBinOpT : Gen BinOpT :=
 {|
   arbitrary := @gen_BinOpT;
@@ -620,7 +743,6 @@ Instance shrBinOpT : Shrink BinOpT :=
 
 
 
-(* Arbitrary version *)
   Derive GenSized for Lab4.
 
   Derive GenSized for Instr.
