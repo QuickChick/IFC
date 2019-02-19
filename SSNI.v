@@ -78,7 +78,7 @@ Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Chec
     forAllShrinkShow gen_variation_state_enum (fun _ => nil) (fun _ => ""%string)
       (* shrinkVState *)
       (fun v => propSSNI_helper t v r).
-  
+
   Definition propSSNI_arb r t : Checker :=
     forAllShrinkShow arbitrary (fun _ => nil) (fun _ => ""%string)
       (fun v => propSSNI_helper t v r).

@@ -260,6 +260,7 @@ Definition instantiate_instructions st : G State :=
   let im' := nseq (length im) instr in
   returnGen (St im' m s r pc)).
 
+
 (* This should become a combinator... *)
 Definition oneOf_enum {A : Type} (def: G A) (gs : list (G A)) : G A :=
   bindGen (enumR (0, length gs - 1)) (fun i => nth def gs i).
@@ -337,7 +338,6 @@ Definition ainstrSSNI_enum (st : State) : G Instr :=
     (* Nop *)
     (1 , pure Nop);
     (19, oneOf_enum (pure Nop) (instr_gen_options))].
-
 
 Definition enum_instructions st : G State :=
   let '(St im m s r pc) := st in
@@ -692,7 +692,8 @@ Definition gen_variation_state : G (@Variation State) :=
 
 Definition copy_imem (st st' : State) : State :=
   let '(St _ m s r p) := st' in St (st_imem st) m s r p.
-  
+
+
 (* Generate an initial state. Instruction opcodes enumerated at the end to save effort.
    TODO : Currently stamps are trivially well formed (all bottom) *)
 Definition gen_variation_state_enum : G (@Variation State) :=
@@ -725,6 +726,7 @@ Definition gen_variation_state_enum : G (@Variation State) :=
       returnGen (Var obs st st'))))))))
     | _ => returnGen (Var bot failed_state failed_state)
   end).
+
 
 (* Arbitrary version *)
 
