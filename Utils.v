@@ -1158,3 +1158,31 @@ Qed.
 
 Definition Z_eqMixin := EqMixin Z_eqbP.
 Canonical Z_eqType := Eval hnf in EqType _ Z_eqMixin.
+
+Definition zreplicate {A:Type} (n:Z) (a:A) : option (seq A) :=
+  if Z_lt_dec n 0 then None
+  else Some (nseq (Z.to_nat n) a).
+
+Lemma nth_error_Z_zreplicate: forall A z (a:A) z' l,
+  zreplicate z a = Some l ->
+  nth_error_Z l z' = if Z_le_dec 0 z' then
+                        if Z_lt_dec z' z then Some a else None
+                     else None.
+Proof.
+  unfold zreplicate, nth_error_Z; intros.
+  destruct (Z_lt_dec z 0); try congruence.
+  inv H.
+  destruct (z' <? 0)%Z eqn:Ez.
+  - rewrite -> Z.ltb_lt in Ez.
+    destruct Z_lt_dec; try omega.
+    destruct Z_le_dec; auto; omega.
+  - assert (~ (z' < 0 )%Z).
+    rewrite <- Z.ltb_lt; try congruence.
+    destruct Z_le_dec; try omega; simpl in *; inv H.
+    rewrite (_ : is_left (Z_lt_dec z' z) = (Z.to_nat z' < Z.to_nat z)).
+      elim: (Z.to_nat z') (Z.to_nat z) {n Ez H0 l0}=> [|n IH] [|n'] //=.
+      by rewrite IH ltnS.
+    assert ( (z'<z)%Z <-> (Z.to_nat z' < Z.to_nat z)%coq_nat).
+      apply Z2Nat.inj_lt; try omega.
+    by apply/sumboolP/ltP; intuition.
+Qed.

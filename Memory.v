@@ -5,53 +5,25 @@ Require Import Coq.Strings.String.
 From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Require Import Utils.
+Require Import Utils Labels Lab4.
+Import LabelEqType.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Definition zreplicate {A:Type} (n:Z) (a:A) : option (seq A) :=
-  if Z_lt_dec n 0 then None
-  else Some (nseq (Z.to_nat n) a).
-
-Lemma nth_error_Z_zreplicate: forall A z (a:A) z' l,
-  zreplicate z a = Some l ->
-  nth_error_Z l z' = if Z_le_dec 0 z' then
-                        if Z_lt_dec z' z then Some a else None
-                     else None.
-Proof.
-  unfold zreplicate, nth_error_Z; intros.
-  destruct (Z_lt_dec z 0); try congruence.
-  inv H.
-  destruct (z' <? 0)%Z eqn:Ez.
-  - rewrite -> Z.ltb_lt in Ez.
-    destruct Z_lt_dec; try omega.
-    destruct Z_le_dec; auto; omega.
-  - assert (~ (z' < 0 )%Z).
-    rewrite <- Z.ltb_lt; try congruence.
-    destruct Z_le_dec; try omega; simpl in *; inv H.
-    rewrite (_ : is_left (Z_lt_dec z' z) = (Z.to_nat z' < Z.to_nat z)).
-      elim: (Z.to_nat z') (Z.to_nat z) {n Ez H0 l0}=> [|n IH] [|n'] //=.
-      by rewrite IH ltnS.
-    assert ( (z'<z)%Z <-> (Z.to_nat z' < Z.to_nat z)%coq_nat).
-      apply Z2Nat.inj_lt; try omega.
-    by apply/sumboolP/ltP; intuition.
-Qed.
+(* I'm ending the craziness. Label model is now fixed to be Lab4. *)
+Definition Label := Lab4.
 
 Inductive alloc_mode := Global | Local.
 
-(* Frames are parameterized over the type of block and the type of Label *)
-(* Cannot make this a parameter because we don't want it opaque.
-   Keep it outside for now, until I figure out what's better *)
-(* Any better solutions than the implicit arguments welcome *)
-Inductive frame {A S} := Fr (label : S) : seq A -> @frame A S.
+Inductive frame A := Fr (lab : Label) : seq A -> frame A.
 
 Section FrameEqType.
 
-Variables A S : eqType.
+Variables A : eqType.
 
-Definition frame_eq (fr1 fr2 : @frame A S) : bool :=
+Definition frame_eq (fr1 fr2 : @frame A) : bool :=
   let: Fr l1 xs1 := fr1 in
   let: Fr l2 xs2 := fr2 in
   [&& l1 == l2 & xs1 == xs2].
@@ -65,133 +37,25 @@ Qed.
 
 Definition frame_eqMixin := EqMixin frame_eqP.
 
-Canonical frame_eqType := Eval hnf in EqType (@frame A S) frame_eqMixin.
+Canonical frame_eqType := Eval hnf in EqType (frame A) frame_eqMixin.
 
 End FrameEqType.
 
-(*
-Module Type MEM.
-  (* Type of memory is parameterized by the type of stamps and the type of block *)
-  Parameter t : Type -> Type -> Type.
-
-  Parameter block : Type -> Type.
-  Parameter stamp : forall {S}, block S -> S.
-
-  Parameter block_eq : forall (S : eqType), block S -> block S -> bool.
-
-  Parameter block_eqP : forall S, Equality.axiom (@block_eq S).
-
-  Definition block_eqMixin (S : eqType) := EqMixin (@block_eqP S).
-  Canonical block_eqType (S : eqType) :=
-    EqType (block S) (block_eqMixin S).
-
-  (* For generation *)
-  Parameter put_stamp : forall {S}, S -> block S -> block S.
-  (* For indistinguishability - return all frames with stamps
-     less than a label (called with top) *)
-
- (* For printing *)
-  Declare Instance show_block : forall {S} {_: Show S}, Show (block S).
-  Declare Instance gen_block : forall {S} `{GenSized S}, GenSized (block S).
-  
-  (* DD -> DP : is a block some kind of "stamped pointer"? *)
-  Parameter get_frame : forall {A S}, t A S -> block S -> option (@frame A S).
-  Parameter upd_frame :
-    forall {A} {S:eqType}, t A S -> block S -> @frame A S -> option (t A S).
-
-  Parameter upd_get_frame : forall A (S : eqType) (m:t A S) (b:block S) fr fr',
-    get_frame m b = Some fr ->
-    exists m',
-      upd_frame m b fr' = Some m'.
-  Parameter get_upd_frame : forall A (S : eqType) (m m':t A S) (b:block S) fr,
-    upd_frame m b fr = Some m' ->
-    forall b',
-      get_frame m' b' = if b == b' then Some fr else get_frame m b'.
-  Parameter upd_frame_defined : forall A (S : eqType) (m m':t A S) (b:block S) fr,
-    upd_frame m b fr = Some m' ->
-    exists fr', get_frame m b = Some fr'.
-
-  Parameter memory_extensionality :
-    forall {A} {S : eqType} (m1 m2 : t A S),
-    (forall (b : block S), get_frame m1 b = get_frame m2 b) -> m1 = m2.
-
-  Parameter get_blocks : forall {A S} , seq S -> t A S -> seq (block S).
-
-  Parameter get_blocks_spec:
-    forall {A} {S : eqType} (labs : seq S) (mem: t A S) (b: block S),
-      (stamp b \in labs) && get_frame mem b <->
-      b \in get_blocks labs mem.
-
-  Parameter empty : forall A S, t A S.
-  Parameter get_empty : forall A S (b:block S), get_frame (empty A S) b = None.
-
-  (* Create a memory with some block initialized to a frame *)
-  (* Parameter init : forall A S {eqS:EqDec S eq}, *)
-  (*                    alloc_mode -> *)
-  (*                    block S -> *)
-  (*                    @frame A S -> *)
-  (*                    t A S. *)
-
-  (* Parameter get_init_eq : forall A S {eqS:EqDec S eq} *)
-  (*                                mode (b : block S) (f : @frame A S), *)
-  (*                           get_frame (init A S mode b f) b = Some f. *)
-
-  (* Parameter get_init_neq : forall A S {eqS:EqDec S eq} *)
-  (*                                 mode (b b' : block S) (f : @frame A S), *)
-  (*                            b' <> b -> *)
-  (*                            get_frame (init A S mode b f) b' = None. *)
-
-  Parameter alloc :
-    forall {A} {S : eqType}, alloc_mode -> t A S -> S -> @frame A S -> (block S * t A S).
-  Parameter alloc_stamp : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') -> stamp b = s.
-  Parameter alloc_get_fresh : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') -> get_frame m b = None.
-  Parameter alloc_get_frame : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') ->
-    forall b', get_frame m' b' = if b == b' then Some fr else get_frame m b'.
-  Parameter alloc_upd : forall A (S : eqType) am (m:t A S) b fr1 s fr2 m',
-    upd_frame m b fr1 = Some m' ->
-    fst (alloc am m' s fr2) = fst (alloc am m s fr2).
-  Parameter alloc_local :
-    forall A (S : eqType) (m1 m2:t A S) s fr1 fr2,
-      (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
-      (alloc Local m1 s fr1).1 = (alloc Local m2 s fr2).1.
-
-  Parameter map : forall {A B S}, (@frame A S -> @frame B S) -> t A S -> t B S.
-  Parameter map_spec : forall A B S (f: @frame A S -> @frame B S) (m:t A S),
-    forall b, get_frame (map f m) b = option_map f (get_frame m b).
-
-End MEM.
- *)
-
 Require Import Coq.Structures.Equalities.
 Require Import Coq.Structures.DecidableTypeEx.
-(*
-From ExtLib Require Import Monad Data.Monads.OptionMonad.
-Import MonadNotation. 
-*)
 From QuickChick Require Import FMapWeakListInstances.
 
-Module Mem (Lab_as_UDT : UsualDecidableType).
-  
-  Definition S := Lab_as_UDT.t.
-  Definition S_eq s1 s2 := if Lab_as_UDT.eq_dec s1 s2 then true else false.
+Module Lab_as_MDT <: MiniDecidableType.
+  Definition t := Label.
+  Definition eq_dec : forall x y : t, {x=y}+{~x=y}.
+  Proof. decide equality. Qed.
+End Lab_as_MDT.
 
-  Definition stamp_eqP : Equality.axiom S_eq.
-  Proof.
-    move => s1 s2. rewrite /S_eq.
-    destruct (Lab_as_UDT.eq_dec s1 s2); simpl in *.
-    - apply ReflectT; auto.
-    - apply ReflectF; auto.
-  Qed.
+Module Lab_as_UDT := Make_UDT(Lab_as_MDT).
   
-  Definition stamp_eqMixin := EqMixin (stamp_eqP).
-  Canonical stamp_eqType := EqType S (stamp_eqMixin).
-  
-  Definition block := (Z * S)%type.
+Definition block := (Z * Lab_as_UDT.t)%type.
 
-  Definition block_eq (b1 b2 : block) := b1 == b2.
+Definition block_eq (b1 b2 : block) := b1 == b2.
 
   Lemma block_eqP : Equality.axiom block_eq.
   Proof. move=> ??; exact/eqP. Qed.
@@ -206,21 +70,22 @@ Module Mem (Lab_as_UDT : UsualDecidableType).
   (* Memory is just a map from stamps to lists of data. *)
   Module Lab_as_DT := UDT_to_DT (Lab_as_UDT).
   Module Map := Make (Lab_as_DT).
-  Definition Mem := Map.t (list (@frame block S)).
+  Definition t A := Map.t (list (@frame A S)).
+  Definition Mem := t.
 
-  Definition get_frame (m : Mem) (b : block) :=
+  Definition get_frame {A} (m : Mem A) (b : block) :=
     match Map.find (snd b) m with
     | Some bs => nth_error_Z bs (fst b)
     | None => None
     end.
 
-  Definition next (m : Mem) (s : S) : Z :=
+  Definition next {A} (m : Mem A) (s : S) : Z :=
     match Map.find s m with
     | Some bs => Z.of_nat (length bs)
     | None => Z0
     end.
 
-  Definition get_frame_next : forall i s m,
+  Theorem get_frame_next {A} : forall i s (m : Mem A),
       (0 <= i < next m s)%Z <-> (exists fr, get_frame m (i,s) = Some fr).
   Proof.
     move => i s m; rewrite /next /get_frame.
@@ -247,46 +112,40 @@ Module Mem (Lab_as_UDT : UsualDecidableType).
       - omega.
       - destruct Hyp; congruence.
     } 
-Qed.
-      Definition Mem := 
-| Mem : 
-  Record _t {A S} := MEM {
-     content :> block S -> option (@frame A S);
-     next : S -> Z;
-     content_next : forall s i, (1 <= i < next s)%Z  <->
-                                (exists fr, content (i,s) = Some fr);
-     next_pos : forall s, (1 <= next s)%Z
-     (* content_some :  *)
-     (*   forall s i, (1 <= i <= (next s) -1)%Z <->  *)
-     (*               (exists fr, content (i, s) = Some fr) *)
-  }.
+  Qed.
 
-  Implicit Arguments _t [].
-  Implicit Arguments MEM [A S].
-  Definition t := _t.
-
-  Definition get_frame {A S} (m:t A S) := content m.
+  Theorem next_pos : forall {A} (m : Mem A) s, (0 <= next m s)%Z.
+  Proof.
+    intros A m s.
+    rewrite /next.
+    destruct (Map.find s m).
+    - apply Nat2Z.is_nonneg.
+    - omega.
+  Qed.
 
   (* Only used in QuickChick proofs *)
-  Definition memory_extensionality {A} {S : eqType} (m1 m2 : t A S)
+  Definition memory_extensionality {A} (m1 m2 : t A)
              (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
+    (* I think this can actually be proved now *)
     admit.
   Admitted.
 
   Definition Z_seq z1 z2 := map Z.of_nat (iota (Z.to_nat z1) (Z.to_nat z2)).
 
-  Definition get_blocks_at_level {A S} (m : t A S) (s : S):=
+  (*
+  Definition get_blocks_at_level {A} (m : t A) (s : S) :=
     let max := next m s in
     let indices := Z_seq 1%Z (max - 1) in
     map (fun ind => (ind,s)) indices.
 
   Definition get_blocks {A S} (ss : list S) (m : t A S) : seq (block S) :=
     flatten (map (get_blocks_at_level m) ss).
+   *)
 
-  Instance show_block {S} {_: Show S}: Show (block S) :=
+  Instance show_block : Show block :=
   {|
     show b :=
-      let (z,s) := (b : block S) in
+      let (z,s) := (b : block) in
       ("(" ++ show z ++ " @ " ++ show s ++ ")")%string
   |}.
 

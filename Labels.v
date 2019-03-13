@@ -4,24 +4,76 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 Require Import Utils.
 
-Class JoinSemiLattice (Lab : Type) :=
-{ bot : Lab
-; join : Lab -> Lab -> Lab
-; flows : Lab -> Lab -> bool
-; meet : Lab -> Lab -> Lab
-; bot_flows : forall l, flows bot l = true
-; flows_refl : forall l, flows l l = true
-; flows_trans : forall l1 l2 l3, flows l1 l2 = true ->
+(** The four point finite lattice (diamond shape) *)
+Inductive Label : Set :=
+  | L  : Label
+  | M1 : Label
+  | M2 : Label
+  | H  : Label.
+
+Definition bot := L.
+
+Definition join l1 l2 :=
+     match l1, l2 with
+       | _ , H  => H
+       | H , _  => H
+       | L , _  => l2
+       | _ , L  => l1
+       | M1, M2 => H
+       | M2, M1 => H
+       | _ , _  => l1 (* l1 == l2 *)
+     end.
+
+Definition flows l1 l2 :=
+    match l1, l2 with
+      | L , L  => true
+      | L , M1 => true
+      | L , M2 => true
+      | L , H  => true
+      | M1, M1 => true
+      | M1, H  => true
+      | M2, M2 => true
+      | M2, H  => true
+      | H , H  => true
+      | _ , _  => false
+    end.
+
+Definition meet l1 l2 :=
+     match l1, l2 with
+       | _ , L  => L
+       | L , _  => L
+       | H , _  => l2
+       | _ , H  => l1
+       | M1, M2 => L
+       | M2, M1 => L
+       | _ , _  => l1 (* l1 == l2 *)
+     end.
+
+Definition bot_flows : forall l, flows bot l = true.
+Proof. now intros l; destruct l; auto. Qed.
+
+Definition flows_refl : forall l, flows l l = true.
+Proof. now intros l; destruct l; auto. Qed.
+
+Definition flows_trans : forall l1 l2 l3, flows l1 l2 = true ->
                                  flows l2 l3 = true ->
-                                 flows l1 l3 = true
-; flows_antisymm : forall l1 l2, flows l1 l2 = true ->
-                                 flows l2 l1 = true -> l1 = l2
-; flows_join_right : forall l1 l2, flows l1 (join l1 l2) = true
-; flows_join_left : forall l1 l2, flows l2 (join l1 l2) = true
-; join_minimal : forall l1 l2 l, flows l1 l = true ->
+                                 flows l1 l3 = true.
+Proof. now intros l1 l2 l3; destruct l1, l2, l3; auto. Qed.
+
+Definition flows_antisymm : forall l1 l2, flows l1 l2 = true ->
+                                 flows l2 l1 = true -> l1 = l2.
+Proof. now intros l1 l2; destruct l1, l2; auto. Qed.
+
+Definition flows_join_right : forall l1 l2, flows l1 (join l1 l2) = true.
+Proof. now intros l1 l2; destruct l1, l2; auto. Qed.
+
+Definition flows_join_left : forall l1 l2, flows l2 (join l1 l2) = true.
+Proof. now intros l1 l2; destruct l1, l2; auto. Qed.
+
+Definition join_minimal : forall l1 l2 l, flows l1 l = true ->
                                  flows l2 l = true ->
-                                 flows (join l1 l2) l = true
-}.
+                                 flows (join l1 l2) l = true.
+Proof. intros l1 l2 l; destruct l1, l2, l; auto. Qed.
 
 Notation "l1 \_/ l2" := (join l1 l2) (at level 40) : type_scope.
 Notation "l1 <: l2" := (flows l1 l2 = true)
@@ -36,15 +88,10 @@ Hint Resolve
   @flows_antisymm
   @join_minimal : lat.
 
-Definition flows_to {Lab : Type} `{JoinSemiLattice Lab} (l1 l2 : Lab) : Z :=
+Definition flows_to (l1 l2 : Label) : Z :=
   if flows l1 l2 then 1%Z else 0%Z.
 
-(** Immediate properties from the semi-lattice structure. *)
-Section JoinSemiLattice_properties.
-
-Context {T: Type}.
-
-Lemma flows_join {L : JoinSemiLattice T} : forall l1 l2,
+Lemma flows_join : forall l1 l2,
   l1 <: l2 <-> l1 \_/ l2 = l2.
 Proof.
   intros.
@@ -58,34 +105,34 @@ Proof.
     auto with lat.
 Qed.
 
-Lemma join_1_rev {L : JoinSemiLattice T} : forall l1 l2 l,
+Lemma join_1_rev : forall l1 l2 l,
   l1 \_/ l2 <: l -> l1 <: l.
 Proof. eauto with lat. Qed.
 
-Lemma join_2_rev {L : JoinSemiLattice T} : forall l1 l2 l,
+Lemma join_2_rev : forall l1 l2 l,
   l1 \_/ l2 <: l -> l2 <: l.
 Proof. eauto with lat. Qed.
 
-Lemma join_1 {L : JoinSemiLattice T} : forall l l1 l2,
+Lemma join_1 : forall l l1 l2,
   l <: l1 -> l <: l1 \_/ l2.
 Proof. eauto with lat. Qed.
 
-Lemma join_2 {L : JoinSemiLattice T} : forall l l1 l2,
+Lemma join_2 : forall l l1 l2,
   l <: l2 -> l <: l1 \_/ l2.
 Proof. eauto with lat. Qed.
 
-Lemma join_bot_right {L : JoinSemiLattice T} : forall l,
+Lemma join_bot_right : forall l,
   l \_/ bot = l.
 Proof.
   eauto using bot_flows with lat.
 Qed.
 
-Lemma join_bot_left {L:  JoinSemiLattice T} : forall l,
+Lemma join_bot_left : forall l,
   bot \_/ l = l.
 Proof. eauto using bot_flows with lat.
 Qed.
 
-Lemma not_flows_not_join_flows_left {L : JoinSemiLattice T} : forall l l1 l2,
+Lemma not_flows_not_join_flows_left : forall l l1 l2,
   flows l1 l = false ->
   flows (l1 \_/ l2) l = false.
 Proof.
@@ -95,7 +142,7 @@ Proof.
   auto.
 Qed.
 
-Lemma not_flows_not_join_flows_right {L : JoinSemiLattice T} : forall l l1 l2,
+Lemma not_flows_not_join_flows_right : forall l l1 l2,
   flows l2 l = false ->
   flows (l1 \_/ l2) l = false.
 Proof.
@@ -105,10 +152,9 @@ Proof.
   auto.
 Qed.
 
-Definition label_eqb {L : JoinSemiLattice T} l1 l2 :=
-  flows l1 l2 && flows l2 l1.
+Definition label_eqb l1 l2 := flows l1 l2 && flows l2 l1.
 
-Lemma label_eqP (L : JoinSemiLattice T) : Equality.axiom label_eqb.
+Lemma label_eqP : Equality.axiom label_eqb.
 Proof.
 move => l1 l2.
 rewrite /label_eqb.
@@ -119,9 +165,7 @@ apply/(iffP idP).
   by rewrite !flows_refl.
 Qed.
 
-Definition label_eqMixin (L : JoinSemiLattice T) := EqMixin (@label_eqP L).
-
-End JoinSemiLattice_properties.
+Definition label_eqMixin := EqMixin label_eqP.
 
 Hint Resolve
   @join_1
@@ -130,8 +174,8 @@ Hint Resolve
   @not_flows_not_join_flows_right
   @not_flows_not_join_flows_left : lat.
 
-Definition label_dec {T : Type} {Lat : JoinSemiLattice T}
-  : forall l1 l2 : T, {l1 = l2} + {l1 <> l2}.
+Definition label_dec 
+  : forall l1 l2 : Label, {l1 = l2} + {l1 <> l2}.
 Proof.
   intros x y.
   destruct (flows x y) eqn:xy;
@@ -141,24 +185,23 @@ Proof.
     right. congruence.
 Defined.
 
-Class Lattice (Lab: Type) :=
-{ jslat :> JoinSemiLattice Lab
-; top : Lab
-; flows_top : forall l, l <: top
-}.
+Definition top := H.
+
+Definition flows_top : forall l, l <: top.
+Proof. intros l; destruct l; auto. Defined.
 
 Module Import LabelEqType.
 
-Canonical label_eqType T {L : JoinSemiLattice T} := Eval hnf in EqType _ (label_eqMixin L).
+Canonical label_eqType := Eval hnf in EqType _ label_eqMixin.
 
 End LabelEqType.
 
-Class FiniteLattice (Lab : Type) :=
-{
-  lat :> Lattice Lab
-; all_labels : list Lab
-; all_labels_correct : forall l : Lab, l \in all_labels
-}.
+Definition all_labels := [:: L;M1;M2;H].
 
-Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
+Definition allThingsBelow (l : Label) : list Label :=
   filter (fun l' => flows l' l) all_labels.
+
+Definition all_labels_correct : forall l, l \in all_labels.
+Proof. by case. Defined.
+
+
