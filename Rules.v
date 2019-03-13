@@ -23,12 +23,6 @@ Set Implicit Arguments.
 
 
 
-Section Rules.
-
-Context {T: Type}.
-Context {Latt: JoinSemiLattice T}.
-
-
 (** * Label expressions *)
 
 (** Labels variables *)
@@ -89,14 +83,14 @@ Definition mk_eval_var (n:nat) (v1 v2 v3: option T) (pc: T) : LAB n -> T :=
 ********)
 
 
-Definition mk_eval_var {n:nat} (vs:Vector.t T n) (pc:T) : LAB n -> T :=
+Definition mk_eval_var {n:nat} (vs:Vector.t Label n) (pc:Label) : LAB n -> Label :=
 fun lv =>
     match lv with
      | lab1 p | lab2 p | lab3 p | lab4 p => nth_order vs p
      | labpc => pc
     end.
 
-Fixpoint eval_expr {n:nat} (eval_var:LAB n -> T) (e: rule_expr n) : T :=
+Fixpoint eval_expr {n:nat} (eval_var:LAB n -> Label) (e: rule_expr n) : Label :=
 match e with
   | L_Bot => bot
   | L_Var labv => eval_var labv
@@ -104,7 +98,7 @@ match e with
 end.
 
 (** eval_cond : evaluates a side_condition with given values for the argument *)
-Fixpoint eval_cond {n:nat} (eval_var:LAB n -> T) (c: rule_scond n) : bool :=
+Fixpoint eval_cond {n:nat} (eval_var:LAB n -> Label) (c: rule_scond n) : bool :=
 match c with
   | A_True => true
   | A_And c1 c2 => andb (eval_cond eval_var c1) (eval_cond eval_var c2)
@@ -116,7 +110,7 @@ end.
     Returns the (optional) result value label and result PC label,
     or nothing when the side condition fails. *)
 Definition apply_rule {n:nat} (r: AllowModify n)
-  (vlabs: Vector.t T n) (pclab:T) : option (option T * T) :=
+  (vlabs: Vector.t Label n) (pclab:Label) : option (option Label * Label) :=
 let eval_var := mk_eval_var vlabs pclab in
   match eval_cond eval_var (allow r) with
     | false => None
@@ -130,7 +124,6 @@ let eval_var := mk_eval_var vlabs pclab in
       Some (rres, rpc)
    end.
 
-End Rules.
 
 (** * Cosmetic notations for writing and applying rules *)
 Notation "'≪' c1 , e1 , lpc '≫'" := (almod c1 (Some e1) lpc) (at level 95, no associativity).

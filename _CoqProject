@@ -1,18 +1,15 @@
 -R . IFC
 compcert/lib/Coqlib.v
 compcert/lib/Integers.v
+Utils.v
 Instructions.v
 Labels.v
-Lab2.v
-Lab4.v
-LabSetsOfPrins.v
 Machine.v
 Memory.v
 Mutate.v
 NIProof.v
 #RelationExtraction.v
 Rules.v
-Utils.v
 TestingCommon.v
 Generation.v
 Indist.v

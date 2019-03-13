@@ -205,3 +205,6 @@ Definition all_labels_correct : forall l, l \in all_labels.
 Proof. by case. Defined.
 
 
+From QuickChick Require Import QuickChick.
+Derive Show for Label.
+Derive Arbitrary for Label.

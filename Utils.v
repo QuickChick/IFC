@@ -707,6 +707,18 @@ Proof.
         eapply IHl; eauto.
 Qed.
 
+Lemma update_list_spec3 (T:Type) : forall (v:T) l n l',
+  update_list l n v = Some l' ->
+  exists v', nth_error l n = Some v'. 
+Proof.
+  induction l; intros.
+  destruct n; simpl in *; inv H.
+  destruct n; simpl in *.
+  - inv H. exists a; auto.
+  - destruct (update_list l n v) eqn:upd; simpl in *; try congruence.
+    inv H.
+    eapply IHl; eauto.
+Qed.    
 
 Lemma update_list_Z_spec2 (T:Type) : forall (v:T) l a a' l',
   update_list_Z l a v = Some l' ->
@@ -720,6 +732,15 @@ Proof.
   apply Z.ltb_ge in Heqb.
   apply Z.ltb_ge in Heqb0.
   intro. apply H0. apply Z2Nat.inj; eauto.
+Qed.
+
+Lemma update_list_Z_spec3 (T:Type) : forall (v:T) l a l',
+  update_list_Z l a v = Some l' ->
+  exists v', nth_error_Z l a = Some v'.
+Proof.
+  unfold update_list_Z, nth_error_Z. intros.
+  destruct (a <? 0)%Z eqn:?. congruence.
+  eapply update_list_spec3; eauto.
 Qed.
 
 Lemma update_list_Some (T: Type): forall (v: T) l n,
@@ -1185,4 +1206,23 @@ Proof.
     assert ( (z'<z)%Z <-> (Z.to_nat z' < Z.to_nat z)%coq_nat).
       apply Z2Nat.inj_lt; try omega.
     by apply/sumboolP/ltP; intuition.
+Qed.
+
+Lemma nth_error_Z_map :
+  forall {A B} (f : A -> B) l i, 
+  nth_error_Z (List.map f l) i = 
+  match nth_error_Z l i with
+  | Some y => Some (f y)
+  | None => None
+  end.
+Proof.
+  rewrite /nth_error_Z => A B f l i.
+  destruct (i <? 0)%Z; auto.
+  destruct (nth_error l (Z.to_nat i)) eqn:HN.
+  - apply map_nth_error; auto.
+  - remember (Z.to_nat i) as n. 
+    move: {i} n {Heqn} HN. induction l; simpl => n HN.
+    + destruct n; simpl in *; auto.
+    + destruct n; simpl in *; auto.
+      * congruence.
 Qed.

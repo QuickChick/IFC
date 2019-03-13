@@ -5,7 +5,7 @@ Require Import Coq.Strings.String.
 From QuickChick Require Import QuickChick.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
-Require Import Utils Labels Lab4.
+Require Import Utils Labels.
 Import LabelEqType.
 
 Set Implicit Arguments.
@@ -13,8 +13,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 (* I'm ending the craziness. Label model is now fixed to be Lab4. *)
-Definition Label := Lab4.
-
 Inductive alloc_mode := Global | Local.
 
 Inductive frame A := Fr (lab : Label) : seq A -> frame A.
@@ -44,11 +42,12 @@ End FrameEqType.
 Require Import Coq.Structures.Equalities.
 Require Import Coq.Structures.DecidableTypeEx.
 From QuickChick Require Import FMapWeakListInstances.
+Require Import Coq.FSets.FMapFacts.
 
 Module Lab_as_MDT <: MiniDecidableType.
   Definition t := Label.
   Definition eq_dec : forall x y : t, {x=y}+{~x=y}.
-  Proof. decide equality. Qed.
+  Proof. decide equality. Defined.
 End Lab_as_MDT.
 
 Module Lab_as_UDT := Make_UDT(Lab_as_MDT).
@@ -57,37 +56,37 @@ Definition block := (Z * Lab_as_UDT.t)%type.
 
 Definition block_eq (b1 b2 : block) := b1 == b2.
 
-  Lemma block_eqP : Equality.axiom block_eq.
-  Proof. move=> ??; exact/eqP. Qed.
+Lemma block_eqP : Equality.axiom block_eq.
+Proof. move=> ??; exact/eqP. Defined.
 
-  Definition block_eqMixin := EqMixin block_eqP.
-  Canonical block_eqType := EqType block block_eqMixin.
+Definition block_eqMixin := EqMixin block_eqP.
+Canonical block_eqType := EqType block block_eqMixin.
 
-  Definition stamp : block -> S := @snd _ _.
-  Definition put_stamp (s : S) (b : block) : block :=
+Definition stamp : block -> Label := @snd _ _.
+Definition put_stamp (s : Label) (b : block) : block :=
     let (z,_) := b in (z,s).
 
-  (* Memory is just a map from stamps to lists of data. *)
-  Module Lab_as_DT := UDT_to_DT (Lab_as_UDT).
-  Module Map := Make (Lab_as_DT).
-  Definition t A := Map.t (list (@frame A S)).
-  Definition Mem := t.
+(* Memory is just a map from stamps to lists of data. *)
+Module Lab_as_DT := UDT_to_DT (Lab_as_UDT).
+Module Map := Make (Lab_as_DT).
+Module MapFacts := WFacts_fun Map.E Map.
+Definition mem A := Map.t (list (frame A)).
 
-  Definition get_frame {A} (m : Mem A) (b : block) :=
+Definition get_frame {A} (m : mem A) (b : block) :=
     match Map.find (snd b) m with
     | Some bs => nth_error_Z bs (fst b)
     | None => None
     end.
 
-  Definition next {A} (m : Mem A) (s : S) : Z :=
+Definition next {A} (m : mem A) (s : Label) : Z :=
     match Map.find s m with
     | Some bs => Z.of_nat (length bs)
     | None => Z0
     end.
 
-  Theorem get_frame_next {A} : forall i s (m : Mem A),
+Theorem get_frame_next {A} : forall i s (m : mem A),
       (0 <= i < next m s)%Z <-> (exists fr, get_frame m (i,s) = Some fr).
-  Proof.
+Proof.
     move => i s m; rewrite /next /get_frame.
     simpl; destruct (Map.find s m) eqn:FindS.
     { split => Hyp.
@@ -112,25 +111,25 @@ Definition block_eq (b1 b2 : block) := b1 == b2.
       - omega.
       - destruct Hyp; congruence.
     } 
-  Qed.
+Qed.
 
-  Theorem next_pos : forall {A} (m : Mem A) s, (0 <= next m s)%Z.
-  Proof.
+Theorem next_pos : forall {A} (m : mem A) s, (0 <= next m s)%Z.
+Proof.
     intros A m s.
     rewrite /next.
     destruct (Map.find s m).
     - apply Nat2Z.is_nonneg.
     - omega.
-  Qed.
+Qed.
 
-  (* Only used in QuickChick proofs *)
-  Definition memory_extensionality {A} (m1 m2 : t A)
-             (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
-    (* I think this can actually be proved now *)
-    admit.
-  Admitted.
+(* Only used in QuickChick proofs *)
+Definition memory_extensionality {A} (m1 m2 : mem A)
+           (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
+  (* I think this can actually be proved now *)
+  admit.
+Admitted.
 
-  Definition Z_seq z1 z2 := map Z.of_nat (iota (Z.to_nat z1) (Z.to_nat z2)).
+Definition Z_seq z1 z2 := map Z.of_nat (iota (Z.to_nat z1) (Z.to_nat z2)).
 
   (*
   Definition get_blocks_at_level {A} (m : t A) (s : S) :=
@@ -142,51 +141,49 @@ Definition block_eq (b1 b2 : block) := b1 == b2.
     flatten (map (get_blocks_at_level m) ss).
    *)
 
-  Instance show_block : Show block :=
+Instance show_block : Show block :=
   {|
     show b :=
       let (z,s) := (b : block) in
       ("(" ++ show z ++ " @ " ++ show s ++ ")")%string
   |}.
 
-  Instance gen_block {S} `{GenSized S} : GenSized (block S) :=
-    {|
-      arbitrarySized := fun n => liftGen2 pair (arbitrarySized n) (arbitrarySized n)
-    |}.
+Instance gen_block : GenSized block :=
+  {|
+    arbitrarySized := fun n => liftGen2 pair (arbitrarySized n) (arbitrarySized n)
+  |}.
 
 
-  Program Definition map {A B S} (f:@frame A S -> @frame B S) (m:t A S) : t B S:=
-    MEM
-      (fun b => omap f (get_frame m b))
-      (next m)
-      _ _.
-  Next Obligation.
-    split.
-    - intros Hrng. destruct (content_next m s i) as [H _]. destruct H.
-      assumption. eexists. unfold get_frame. rewrite H. reflexivity.
-    - intros [fr Heq]. destruct (content_next m s i) as [_ H].
-      apply H. unfold get_frame in Heq. destruct (m (i, s)).
-      eexists. reflexivity. discriminate.
-  Qed.
-  Next Obligation.
-    destruct m. auto.
-  Qed.
+Definition map {A B} (f:frame A -> frame B) (m:mem A) : mem B :=
+  Map.map (List.map f) m.
 
-  Lemma map_spec : forall A B S (f:@frame A S -> @frame B S) (m:t A S),
+Lemma MapsTo_In : forall {A} m k {v : A}, Map.MapsTo k v m -> Map.In k m.
+Proof. intros; exists v; auto. Qed.
+
+Lemma map_spec : forall A B (f:frame A -> frame B) (m:mem A),
     forall b, get_frame (map f m) b = omap f (get_frame m b).
-  Proof.
-    auto.
-  Qed.
+Proof.
+  intros.
+  rewrite /get_frame /map /omap /obind /oapp.
+  destruct (Map.find b.2 m) eqn:Find.
+  - remember Find as Maps. clear HeqMaps. apply Map.find_2 in Maps.
+    apply Map.map_1 with (f := List.map f) in Maps.
+    apply Map.find_1 in Maps.
+    rewrite Maps.
+    apply nth_error_Z_map.
+  - destruct (Map.find b.2 (Map.map (List.map f) m)) as [? | ?] eqn:Contra; auto.
+    apply Map.find_2 in Contra.
+    apply MapsTo_In in Contra.
+    apply Map.map_2 in Contra.
+    destruct Contra as [x Hx].
+    apply Map.find_1 in Hx.
+    congruence.
+Qed.
 
-  Program Definition empty A S : t A S := MEM
-    (fun b => None) (fun _ => 1%Z) _ _.
-  Next Obligation.
-    split. omega. intros [fr contra]. congruence.
-  Qed.
-
-
-  Lemma get_empty : forall A S b, get_frame (empty A S)  b = None.
-  Proof. auto. Qed.
+Definition empty A : mem A := Map.empty _.
+  
+Lemma get_empty : forall A b, get_frame (empty A)  b = None.
+Proof. auto. Qed.
 
   (* Program Definition init A S {eqS : EqDec S eq} (am : alloc_mode) b f : t A S:= MEM *)
   (*   (fun b' : block S => if b' == b then Some f else None) *)
@@ -227,8 +224,95 @@ Definition block_eq (b1 b2 : block) := b1 == b2.
   (*   end. *)
   (* Qed. *)
 
-  Program Definition upd_frame_rich {A} {S : eqType} (m:t A S) (b0:block S) (fr:@frame A S)
-  : option { m' : (t A S) |
+Definition upd_frame {A} (m:mem A) (b:block) (fr:frame A) : option (mem A) :=
+  let (i,s) := b in
+  match Map.find s m with
+  | None => None
+  | Some l =>
+    match update_list_Z l i fr with
+    | Some l' => Some (Map.add s l' m)
+    | None => None
+    end
+  end.
+
+Lemma upd_get_frame : forall A (m:mem A) (b:block) fr fr',
+    get_frame m b = Some fr ->
+    exists m', upd_frame m b fr' = Some m'.
+Proof.
+  rewrite /upd_frame /get_frame => A m b fr fr' HGet.
+  destruct (Map.find b.2 m) eqn:Find.
+  - apply valid_update with (x':= fr') in HGet.
+    move: HGet => [l' Hl'].
+    destruct b as [i s]; simpl in *.
+    exists (Map.add s l' m).
+    rewrite Find.
+    rewrite Hl'.
+    auto.
+  - congruence.
+Qed.
+
+Lemma eq_refl_false : forall (A : eqType) (x : A), x == x = false -> False.
+Proof. 
+  move => A x H.
+  pose proof (eq_refl x).
+  congruence.
+Qed.  
+
+Lemma get_upd_frame : forall A (m m':mem A) (b:block) fr,
+    upd_frame m b fr = Some m' ->
+    forall b',
+      get_frame m' b' = if b == b' then Some fr else get_frame m b'.
+Proof.
+  rewrite /upd_frame /get_frame => A m m' [i s] fr Hupd [i' s'] //=.
+  destruct (Map.find s m) as [l|] eqn:Find;
+  destruct (Map.find s' m') as [l'|] eqn:Find';
+  destruct (@eq_op block_eqType (i, s) (i', s')) eqn:Eq;
+  simpl in *; auto; try congruence.
+  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
+    assert (H: @eq block (i,s) (i', s')) by (apply /eqP; auto); inv H.
+    inv Hupd.
+    apply Map.find_2 in Find'.
+    apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? ?]]; [subst |congruence].
+    eapply update_list_Z_spec; eauto.
+  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
+    inv Hupd.
+    destruct (s == s') eqn:HS.
+    + assert (H : s = s') by (apply /eqP; auto); inv H.
+      rewrite Find.
+      apply Map.find_2 in Find'.
+      apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? ?]]; [subst |congruence].
+      destruct (i == i') eqn:HI.
+      * assert (H' : i = i') by (apply /eqP; auto); inv H'.
+        apply eq_refl_false in Eq; inv Eq.
+      * assert (i <> i').
+        { move => ?; subst; apply eq_refl_false in Eq; inv Eq. }
+        eapply update_list_Z_spec2 in Upd; eauto.
+    + apply Map.find_2 in Find'.
+      apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? Find']]; subst;
+      [ apply eq_refl_false in HS; inv HS |] .
+      apply Map.find_1 in Find'.
+      rewrite Find'.
+      auto.
+  - assert (H: @eq block (i,s) (i', s')) by (apply /eqP; auto); inv H.
+    destruct (update_list_Z l i' fr) as [l'' |] eqn:Upd; try congruence.
+    inv Hupd.
+    rewrite MapFacts.add_o in Find'.
+    destruct (Map.E.eq_dec s' s'); subst; try congruence.
+  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
+    inv Hupd.
+    destruct (s == s') eqn:HS.
+    + assert (H : s = s') by (apply /eqP; auto); inv H.
+      rewrite MapFacts.add_o in Find'.
+      destruct (Map.E.eq_dec s' s'); subst; try congruence.
+    + rewrite MapFacts.add_o in Find'.
+      destruct (Map.E.eq_dec s s'); subst; try congruence.
+      rewrite Find'.
+      auto.
+Qed.
+
+(*
+Definition upd_frame_rich {A} (m:mem A) (b:block) (fr:frame A)
+  : option { m' : (mem A S) |
              (forall b',
                 get_frame m' b' = if b0 == b' then Some fr else get_frame m b')
            /\ forall s, next m s = next m' s} :=
@@ -260,52 +344,24 @@ Definition block_eq (b1 b2 : block) := b1 == b2.
       | None => None
       | Some (exist m' _) => Some m'
     end.
+*)
 
-  Program Lemma upd_get_frame : forall A (S : eqType) (m:t A S) (b:block S) fr fr',
-    get_frame m b = Some fr ->
-    exists m',
-      upd_frame m b fr' = Some m'.
-  Proof.
-    unfold upd_frame, upd_frame_rich, get_frame.
-    intros.
-    generalize (@erefl (option (@frame A S)) (m b)).
-    generalize (@upd_frame_rich_obligation_3 A S m b fr').
-    generalize (@upd_frame_rich_obligation_2 A S m b fr').
-    generalize (@upd_frame_rich_obligation_1 A S m b fr').
-    simpl.
-(*    move => HI ? HA Eq.
-    symmetry in H.
-    pose proof (HI fr H) as Hyp1.
-    pose proof (HA fr H) as Hyp2.
-    symmetry in H.
-*)  
-    (* rewrite H. intros. eauto. *)
-  Admitted.
-
-  Lemma get_upd_frame : forall A (S : eqType) (m m':t A S) (b:block S) fr,
-    upd_frame m b fr = Some m' ->
-    forall b',
-      get_frame m' b' = if b == b' then Some fr else get_frame m b'.
-  Proof.
-    unfold upd_frame; intros.
-    destruct (upd_frame_rich m b fr); try congruence.
-    destruct s; inv H; intuition.
-  Qed.
-
-  Lemma upd_frame_defined : forall A (S : eqType) (m m':t A S) (b:block S) fr,
+Lemma upd_frame_defined : forall A (m m':mem A) (b:block) fr,
     upd_frame m b fr = Some m' ->
     exists fr', get_frame m b = Some fr'.
-  Proof.
-    unfold upd_frame, upd_frame_rich, get_frame.
-    intros until 0.
-    generalize (@erefl (option (@frame A S)) (@content A S m b)).
-    generalize (@upd_frame_rich_obligation_3 A S m b fr).
-    generalize (@upd_frame_rich_obligation_2 A S m b fr).
-    generalize (@upd_frame_rich_obligation_1 A S m b fr).
-    simpl.
-    intros.
-    (* destruct (m b); eauto; congruence. *)
-  Admitted.
+Proof.
+  rewrite /upd_frame /get_frame.
+  move => A m m' [i s] fr Upd.
+  destruct (Map.find s m) eqn:Find; [|congruence].
+  destruct (update_list_Z l i fr) as [l'|] eqn:Upd'; [|congruence].
+  inv Upd.
+  apply update_list_Z_spec3 in Upd'.
+  move: Upd' => [fr' Hfr'].
+  exists fr'.
+  simpl in *; auto.
+  rewrite Find.
+  auto.
+Qed.
 
   Opaque Z.add.
 
