@@ -69,6 +69,7 @@ Canonical frame_eqType := Eval hnf in EqType (@frame A S) frame_eqMixin.
 
 End FrameEqType.
 
+(*
 Module Type MEM.
   (* Type of memory is parameterized by the type of stamps and the type of block *)
   Parameter t : Type -> Type -> Type.
@@ -162,25 +163,93 @@ Module Type MEM.
     forall b, get_frame (map f m) b = option_map f (get_frame m b).
 
 End MEM.
+ *)
 
-(* For indist/generation purposes, our implementation has to be less generic or
-   give our labels a function "allLabelsBelow". For now do the latter *)
-Module Mem: MEM.
-  Definition block S := (Z * S)%type.
+Require Import Coq.Structures.Equalities.
+Require Import Coq.Structures.DecidableTypeEx.
+(*
+From ExtLib Require Import Monad Data.Monads.OptionMonad.
+Import MonadNotation. 
+*)
+From QuickChick Require Import FMapWeakListInstances.
 
-  Definition block_eq (S : eqType) (b1 b2 : block S) := b1 == b2.
+Module Mem (Lab_as_UDT : UsualDecidableType).
+  
+  Definition S := Lab_as_UDT.t.
+  Definition S_eq s1 s2 := if Lab_as_UDT.eq_dec s1 s2 then true else false.
 
-  Lemma block_eqP (S : eqType) : Equality.axiom (@block_eq S).
+  Definition stamp_eqP : Equality.axiom S_eq.
+  Proof.
+    move => s1 s2. rewrite /S_eq.
+    destruct (Lab_as_UDT.eq_dec s1 s2); simpl in *.
+    - apply ReflectT; auto.
+    - apply ReflectF; auto.
+  Qed.
+  
+  Definition stamp_eqMixin := EqMixin (stamp_eqP).
+  Canonical stamp_eqType := EqType S (stamp_eqMixin).
+  
+  Definition block := (Z * S)%type.
+
+  Definition block_eq (b1 b2 : block) := b1 == b2.
+
+  Lemma block_eqP : Equality.axiom block_eq.
   Proof. move=> ??; exact/eqP. Qed.
 
-  Definition block_eqMixin (S : eqType) := EqMixin (@block_eqP S).
-  Canonical block_eqType (S : eqType) :=
-    EqType (block S) (block_eqMixin S).
+  Definition block_eqMixin := EqMixin block_eqP.
+  Canonical block_eqType := EqType block block_eqMixin.
 
-  Definition stamp S : block S -> S := @snd _ _.
-  Definition put_stamp S (s : S) (b : block S) : block S :=
+  Definition stamp : block -> S := @snd _ _.
+  Definition put_stamp (s : S) (b : block) : block :=
     let (z,_) := b in (z,s).
 
+  (* Memory is just a map from stamps to lists of data. *)
+  Module Lab_as_DT := UDT_to_DT (Lab_as_UDT).
+  Module Map := Make (Lab_as_DT).
+  Definition Mem := Map.t (list (@frame block S)).
+
+  Definition get_frame (m : Mem) (b : block) :=
+    match Map.find (snd b) m with
+    | Some bs => nth_error_Z bs (fst b)
+    | None => None
+    end.
+
+  Definition next (m : Mem) (s : S) : Z :=
+    match Map.find s m with
+    | Some bs => Z.of_nat (length bs)
+    | None => Z0
+    end.
+
+  Definition get_frame_next : forall i s m,
+      (0 <= i < next m s)%Z <-> (exists fr, get_frame m (i,s) = Some fr).
+  Proof.
+    move => i s m; rewrite /next /get_frame.
+    simpl; destruct (Map.find s m) eqn:FindS.
+    { split => Hyp.
+    - apply nth_error_Z_valid2.
+      destruct Hyp as [H1 H2].
+      split; auto.
+      apply /ltP.
+      apply Z2Nat.inj_lt in H2; auto.
+      { rewrite Nat2Z.id in H2; auto. }
+      omega.
+    - destruct Hyp as [fr Hfr].
+      apply nth_error_Z_valid in Hfr.
+      destruct Hfr as [H1 H2].
+      split; auto.
+      apply Z2Nat.inj_lt; auto.
+      { apply Nat2Z.is_nonneg. }
+      rewrite Nat2Z.id.
+      apply /ltP.
+      auto.
+    }
+    { split => Hyp.
+      - omega.
+      - destruct Hyp; congruence.
+    } 
+Qed.
+      Definition Mem := 
+| Mem : 
   Record _t {A S} := MEM {
      content :> block S -> option (@frame A S);
      next : S -> Z;

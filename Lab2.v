@@ -42,5 +42,5 @@ Defined.
 Instance Lattice_Lab2 : Lattice Lab2 := { top := H }.
 Proof. intros l; destruct l; auto. Defined.
 
-Instance FiniteLattice_Lab2 : FiniteLattice Lab2 := { elems := [:: L;H] }.
+Instance FiniteLattice_Lab2 : FiniteLattice Lab2 := { all_labels := [:: L;H] }.
 Proof. by case. Defined.

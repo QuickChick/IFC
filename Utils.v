@@ -582,6 +582,16 @@ Proof.
      ssromega.
 Qed.
 
+Lemma nth_error_valid2 (T:Type): forall (l:list T) n,
+    n < length l -> exists v, nth_error l n = Some v.
+Proof.
+  move => l; induction l => n HLen.
+  - inv HLen.
+  - destruct n; simpl in *.
+    + exists a; auto.
+    + destruct (IHl n); auto.
+Qed.
+
 Lemma nth_error_Z_valid (T:Type): forall i (l:list T) v,
    nth_error_Z l i = Some v -> (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat.
 Proof.
@@ -591,6 +601,19 @@ Proof.
    eapply nth_error_valid; eauto.
 Qed.
 
+Lemma nth_error_Z_valid2 (T:Type): forall i (l:list T),
+    (0 <= i)%Z  /\ (Z.to_nat i < length l)%nat ->
+    exists v, nth_error_Z l i = Some v.
+Proof.
+  intros.
+  unfold nth_error_Z.
+  destruct H as [H1 H2].
+  destruct (nth_error_valid2 l (Z.to_nat i)); auto.
+  exists x.
+  destruct ((i <? 0)%Z) eqn:?; auto.
+    apply Z.ltb_lt in Heqb.
+    omega.
+Qed.
 
 Fixpoint update_list A (xs : list A) (n : nat) (y : A) : option (list A) :=
   match xs, n with

@@ -57,5 +57,5 @@ Defined.
 Instance Lattice_Lab4 : Lattice Lab4 := { top := H }.
 Proof. intros l; destruct l; auto. Defined.
 
-Instance FiniteLattice_Lab4 : FiniteLattice Lab4 := { elems := [:: L;M1;M2;H] }.
+Instance FiniteLattice_Lab4 : FiniteLattice Lab4 := { all_labels := [:: L;M1;M2;H] }.
 Proof. by case. Defined.

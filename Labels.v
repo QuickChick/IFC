@@ -156,9 +156,9 @@ End LabelEqType.
 Class FiniteLattice (Lab : Type) :=
 {
   lat :> Lattice Lab
-; elems : list Lab
-; all_elems : forall l : Lab, l \in elems
+; all_labels : list Lab
+; all_labels_correct : forall l : Lab, l \in all_labels
 }.
 
 Definition allThingsBelow {L : Type} `{FiniteLattice L} (l : L) : list L :=
-  filter (fun l' => flows l' l) elems.
+  filter (fun l' => flows l' l) all_labels.
