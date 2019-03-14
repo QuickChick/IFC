@@ -16,11 +16,12 @@ Require Import Reachability.
 
 Definition is_low_state st lab := isLow (pc_lab (st_pc st)) lab.
 
-Record exp_result := MkExpResult { exp_success : Checker
-                                 ; exp_fail    : Checker
-                                 ; exp_reject  : Checker
-                                 ; exp_check   : bool -> Checker
-                                 }.
+Record exp_result {A} :=
+  MkExpResult { exp_success : A
+              ; exp_fail    : A
+              ; exp_reject  : A
+              ; exp_check   : bool -> A
+              }.
 
 (* HACK: To get statistics on successful runs/discards/avg test failures, we can 
    assume everything succeeds and collect the result. *)
@@ -47,8 +48,14 @@ Definition exp_result_normal : exp_result :=
    ; exp_check   := (fun b => checker b)
   |}.
 
+Definition exp_result_opt_bool : exp_result :=
+  {| exp_success := Some true
+   ; exp_fail    := Some false
+   ; exp_reject  := None
+   ; exp_check   := (fun b => Some b)
+  |}.
   
-Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Checker  :=
+Definition propSSNI_helper {A} (t : table) (v : Variation) (res : exp_result) : A  :=
     let '(Var lab st1 st2) := v in
     if indist lab st1 st2 then
       (* XXX Our generator should always give us this by design.
@@ -86,5 +93,6 @@ Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Chec
   Definition propSSNI_arb r t : Checker :=
     forAllShrinkShow arbitrary (fun _ => nil) (fun _ => ""%string)
       (fun v => propSSNI_helper t v r).
+
 
 

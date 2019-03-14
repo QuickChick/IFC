@@ -227,10 +227,10 @@ Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
 
 Definition memory := mem Atom.
 (* Specialize the Memory frame declaration *)
-Definition frame := frame Atom.
+Definition frame := memframe Atom.
 
 Canonical frame_eqType :=
-  Eval hnf in EqType frame (frame_eqMixin [eqType of Atom]). 
+  Eval hnf in EqType frame (memframe_eqMixin [eqType of Atom]). 
 
 Definition alloc (size:Z) (lab stamp:Label) (a:Atom) (m:memory)
 : option (mframe * memory) :=
@@ -241,7 +241,7 @@ Definition alloc (size:Z) (lab stamp:Label) (a:Atom) (m:memory)
 
 Definition load (m : memory) (p : Pointer) : option Atom :=
   let '(Ptr f addr) := p in
-  match get_frame m f with
+  match get_memframe m f with
     | None => None
     | Some (Fr _ fr) => nth_error_Z fr addr
   end.
@@ -249,25 +249,25 @@ Definition load (m : memory) (p : Pointer) : option Atom :=
 Definition store (m : memory) (p : Pointer) (a:Atom)
 : option (memory) :=
   let '(Ptr f addr) := p in
-  match get_frame m f with
+  match get_memframe m f with
     | None => None
     | Some (Fr lab data) =>
       match update_list_Z data addr a with
         | None => None
-        | Some data' => (upd_frame m f (Fr lab data'))
+        | Some data' => (upd_memframe m f (Fr lab data'))
       end
   end.
 
 Definition msize (m:memory) (p:Pointer) : option nat :=
   let (fp,i) := p in
-  match get_frame m fp with
+  match get_memframe m fp with
     | Some (Fr _ data) => Some (length data)
     | _ => None
   end.
 
 Definition mlab (m:memory) (p:Pointer) : option Label :=
   let (fp,i) := p in
-  match get_frame m fp with
+  match get_memframe m fp with
     | Some (Fr l _) => Some l
     | _ => None
   end.
@@ -284,7 +284,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
 Proof.
   unfold alloc, load; intros.
   destruct (zreplicate size a) eqn:Ez; try congruence; inv H.
-  rewrite (alloc_get_frame H1).
+  rewrite (alloc_get_memframe H1).
   case: (mf =P mf')=> ? //=; simpl in *.
   subst.
   simpl.
@@ -300,10 +300,10 @@ Lemma load_store : forall {m m'} {b ofs a},
       else load m (Ptr b' ofs').
 Proof.
   unfold store, load; intros.
-  destruct (get_frame m b) eqn:E1; try congruence.
-  destruct f as [lab l].
+  destruct (get_memframe m b) eqn:E1; try congruence.
+  destruct m0 as [lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
-  rewrite (get_upd_frame H).
+  rewrite (get_upd_memframe H).
   have [e|neb //] := (b =P b'); simpl in *.
   subst b'.
   have [?|?] := eqP.
@@ -338,52 +338,52 @@ Lemma load_some_store_some : forall {m:memory} {b ofs a},
       exists m', store m (Ptr b ofs) a' = Some m'.
 Proof.
   unfold load, store; intros.
-  destruct (get_frame m b) eqn:E; try congruence.
-  destruct f eqn:?. (* I don't like this *)
+  destruct (get_memframe m b) eqn:E; try congruence.
+  destruct m0 eqn:?. (* I don't like this *)
   exploit nth_error_Z_valid; eauto.
   destruct 1.
   destruct (@update_list_Z_Some _ a' l ofs); auto.
   rewrite H2.
-  eapply upd_get_frame; eauto.
+  eapply upd_get_memframe; eauto.
 Qed.
 
-Lemma get_frame_store_neq :
+Lemma get_memframe_store_neq :
   forall (m : memory ) b b' off a m'
          (STORE : store m (Ptr b off) a = Some m')
          (NEQ : b' <> b),
-    get_frame m' b' = get_frame m b'.
+    get_memframe m' b' = get_memframe m b'.
 Proof.
   unfold store.
   intros.
-  destruct (get_frame m b) as [f|] eqn:FRAME; try congruence.
+  destruct (get_memframe m b) as [f|] eqn:FRAME; try congruence.
   destruct f as [lab l] eqn:?.
   destruct (update_list_Z l off a) as [l'|] eqn:NEWFRAME; try congruence.
-  eapply get_frame_upd_frame_neq; eauto.
+  eapply get_memframe_upd_memframe_neq; eauto.
 Qed.
 
-Lemma alloc_get_frame_eq :
+Lemma alloc_get_memframe_eq :
   forall s (mem : memory) f b mem',
     Memory.alloc mem s f = (b, mem') ->
-    get_frame mem' b = Some f.
+    get_memframe mem' b = Some f.
 Proof.
   intros.
-  erewrite alloc_get_frame; eauto.
+  erewrite alloc_get_memframe; eauto.
   by rewrite eqxx.
 Qed.
 
-Lemma alloc_get_frame_neq :
+Lemma alloc_get_memframe_neq :
   forall s (mem : memory) f b b' mem',
     Memory.alloc mem s f = (b, mem') ->
     b <> b' ->
-    get_frame mem' b' = get_frame mem b'.
+    get_memframe mem' b' = get_memframe mem b'.
 Proof.
   intros.
-  erewrite alloc_get_frame; eauto.
+  erewrite alloc_get_memframe; eauto.
   have [?|?] := (b =P b'); simpl in *; congruence.
 Qed.
 
 Definition extends (m1 m2 : memory) : Prop :=
-  forall b fr, get_frame m1 b = Some fr -> get_frame m2 b = Some fr.
+  forall b fr, get_memframe m1 b = Some fr -> get_memframe m2 b = Some fr.
 
 Lemma extends_refl : forall (m : memory), extends m m.
 Proof. unfold extends. auto. Qed.
@@ -399,7 +399,7 @@ Lemma extends_load (m1 m2 : memory) b off a :
 Proof.
   intros.
   unfold load in *.
-  destruct (get_frame m1 b) as [fr|] eqn:FRAME; inv DEF.
+  destruct (get_memframe m1 b) as [fr|] eqn:FRAME; inv DEF.
   erewrite EXT; eauto.
 Qed.
 

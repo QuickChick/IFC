@@ -228,7 +228,7 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
       (if f1 == f2 then show f1
       else show_variation (show f1) (show f2)) ++ (
       (* Show actual corresponding frames *)
-      match get_frame m1 f1, get_frame m2 f2 with
+      match get_memframe m1 f1, get_memframe m2 f2 with
         | Some (Fr l1 data1), Some (Fr l2 data2) =>
           (if eqtype.eq_op l1 l2 then
             "DFR @ " ++ show l1 ++ " : [ "
@@ -255,7 +255,7 @@ Definition show_high_frames m (mfs : list mframe) :=
       match mfs with
         | [::] => ""
         | h :: t =>
-          match get_frame m h with
+          match get_memframe m h with
             | Some f => par (show h) ++ " : " ++ show f ++ nl ++ aux t
             | _ => "ERROR SHOWING EXTRA FRAMES"
           end

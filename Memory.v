@@ -13,31 +13,31 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 (* I'm ending the craziness. Label model is now fixed to be Lab4. *)
-Inductive frame A := Fr (lab : Label) : seq A -> frame A.
+Inductive memframe A := Fr (lab : Label) : seq A -> memframe A.
 
-Derive Arbitrary for frame.
-Derive Fuzzy for frame.
-Derive Show for frame. 
+Derive Arbitrary for memframe.
+Derive Fuzzy for memframe.
+Derive Show for memframe. 
 
 Section FrameEqType.
 
 Variables A : eqType.
 
-Definition frame_eq (fr1 fr2 : @frame A) : bool :=
+Definition memframe_eq (fr1 fr2 : @memframe A) : bool :=
   let: Fr l1 xs1 := fr1 in
   let: Fr l2 xs2 := fr2 in
   [&& l1 == l2 & xs1 == xs2].
 
-Lemma frame_eqP : Equality.axiom frame_eq.
+Lemma memframe_eqP : Equality.axiom memframe_eq.
 Proof.
 move=> [l1 xs1] [l2 xs2]; apply/(iffP andP).
   by move=> [/eqP -> /eqP ->].
 by move => [-> ->]; rewrite !eqxx.
 Qed.
 
-Definition frame_eqMixin := EqMixin frame_eqP.
+Definition memframe_eqMixin := EqMixin memframe_eqP.
 
-Canonical frame_eqType := Eval hnf in EqType (frame A) frame_eqMixin.
+Canonical memframe_eqType := Eval hnf in EqType (memframe A) memframe_eqMixin.
 
 End FrameEqType.
 
@@ -72,9 +72,9 @@ Definition put_stamp (s : Label) (b : block) : block :=
 Module Lab_as_DT := UDT_to_DT (Lab_as_UDT).
 Module Map := Make (Lab_as_DT).
 Module MapFacts := WFacts_fun Map.E Map.
-Definition mem A := Map.t (list (frame A)).
+Definition mem A := Map.t (list (memframe A)).
 
-Definition get_frame {A} (m : mem A) (b : block) :=
+Definition get_memframe {A} (m : mem A) (b : block) :=
     match Map.find (snd b) m with
     | Some bs => nth_error_Z bs (fst b)
     | None => None
@@ -86,10 +86,10 @@ Definition next {A} (m : mem A) (s : Label) : Z :=
     | None => Z0
     end.
 
-Theorem get_frame_next {A} : forall i s (m : mem A),
-      (0 <= i < next m s)%Z <-> (exists fr, get_frame m (i,s) = Some fr).
+Theorem get_memframe_next {A} : forall i s (m : mem A),
+      (0 <= i < next m s)%Z <-> (exists fr, get_memframe m (i,s) = Some fr).
 Proof.
-    move => i s m; rewrite /next /get_frame.
+    move => i s m; rewrite /next /get_memframe.
     simpl; destruct (Map.find s m) eqn:FindS.
     { split => Hyp.
     - apply nth_error_Z_valid2.
@@ -126,7 +126,7 @@ Qed.
 
 (* Only used in QuickChick proofs *)
 Definition memory_extensionality {A} (m1 m2 : mem A)
-           (H : forall b, get_frame m1 b = get_frame m2 b) : m1 = m2.
+           (H : forall b, get_memframe m1 b = get_memframe m2 b) : m1 = m2.
   (* I think this can actually be proved now *)
   admit.
 Admitted.
@@ -154,17 +154,17 @@ Instance gen_block : GenSized block :=
   |}.
 
 
-Definition map {A B} (f:frame A -> frame B) (m:mem A) : mem B :=
+Definition map {A B} (f:memframe A -> memframe B) (m:mem A) : mem B :=
   Map.map (List.map f) m.
 
 Lemma MapsTo_In : forall {A} m k {v : A}, Map.MapsTo k v m -> Map.In k m.
 Proof. intros; exists v; auto. Qed.
 
-Lemma map_spec : forall A B (f:frame A -> frame B) (m:mem A),
-    forall b, get_frame (map f m) b = omap f (get_frame m b).
+Lemma map_spec : forall A B (f:memframe A -> memframe B) (m:mem A),
+    forall b, get_memframe (map f m) b = omap f (get_memframe m b).
 Proof.
   intros.
-  rewrite /get_frame /map /omap /obind /oapp.
+  rewrite /get_memframe /map /omap /obind /oapp.
   destruct (Map.find b.2 m) eqn:Find.
   - remember Find as Maps. clear HeqMaps. apply Map.find_2 in Maps.
     apply Map.map_1 with (f := List.map f) in Maps.
@@ -182,7 +182,7 @@ Qed.
 
 Definition empty A : mem A := Map.empty _.
   
-Lemma get_empty : forall A b, get_frame (empty A)  b = None.
+Lemma get_empty : forall A b, get_memframe (empty A)  b = None.
 Proof. auto. Qed.
 
   (* Program Definition init A S {eqS : EqDec S eq} (am : alloc_mode) b f : t A S:= MEM *)
@@ -200,8 +200,8 @@ Proof. auto. Qed.
   (* Qed. *)
 
   (* Lemma get_init_eq : forall A S {eqS:EqDec S eq} *)
-  (*                            mode (b : block S) (f : @frame A S), *)
-  (*                       get_frame (init A S mode b f) b = Some f. *)
+  (*                            mode (b : block S) (f : @memframe A S), *)
+  (*                       get_memframe (init A S mode b f) b = Some f. *)
   (* Proof. *)
   (*   unfold init. simpl. *)
   (*   intros. *)
@@ -212,9 +212,9 @@ Proof. auto. Qed.
   (* Qed. *)
 
   (* Lemma get_init_neq : forall A S {eqS:EqDec S eq} *)
-  (*                             mode (b b' : block S) (f : @frame A S), *)
+  (*                             mode (b b' : block S) (f : @memframe A S), *)
   (*                        b' <> b -> *)
-  (*                        get_frame (init A S mode b f) b' = None. *)
+  (*                        get_memframe (init A S mode b f) b' = None. *)
   (* Proof. *)
   (*   unfold init. simpl. *)
   (*   intros. *)
@@ -224,7 +224,7 @@ Proof. auto. Qed.
   (*   end. *)
   (* Qed. *)
 
-Definition upd_frame {A} (m:mem A) (b:block) (fr:frame A) : option (mem A) :=
+Definition upd_memframe {A} (m:mem A) (b:block) (fr:memframe A) : option (mem A) :=
   let (i,s) := b in
   match Map.find s m with
   | None => None
@@ -309,34 +309,34 @@ Ltac solver :=
     (* Finish with eauto + list_Z hint database *)
     eauto with listZ.
 
-Lemma upd_get_frame : forall A (m:mem A) (b:block) fr fr',
-    get_frame m b = Some fr ->
-    exists m', upd_frame m b fr' = Some m'.
+Lemma upd_get_memframe : forall A (m:mem A) (b:block) fr fr',
+    get_memframe m b = Some fr ->
+    exists m', upd_memframe m b fr' = Some m'.
 Proof.
-  rewrite /upd_frame /get_frame => A m [i s] fr fr' HGet; simpl in *.
+  rewrite /upd_memframe /get_memframe => A m [i s] fr fr' HGet; simpl in *.
   repeat solver; try congruence.
 Qed.
 
-Lemma get_upd_frame : forall A (m m':mem A) (b:block) fr,
-    upd_frame m b fr = Some m' ->
+Lemma get_upd_memframe : forall A (m m':mem A) (b:block) fr,
+    upd_memframe m b fr = Some m' ->
     forall b',
-      get_frame m' b' = if b == b' then Some fr else get_frame m b'.
+      get_memframe m' b' = if b == b' then Some fr else get_memframe m b'.
 Proof.
-  rewrite /upd_frame /get_frame => A m m' [i s] fr Hupd [i' s'] //=.
+  rewrite /upd_memframe /get_memframe => A m m' [i s] fr Hupd [i' s'] //=.
   repeat solver; try congruence.
 Qed.
 
-Lemma upd_frame_defined : forall A (m m':mem A) (b:block) fr,
-    upd_frame m b fr = Some m' ->
-    exists fr', get_frame m b = Some fr'.
+Lemma upd_memframe_defined : forall A (m m':mem A) (b:block) fr,
+    upd_memframe m b fr = Some m' ->
+    exists fr', get_memframe m b = Some fr'.
 Proof.
-  rewrite /upd_frame /get_frame => A m m' [i s] fr Upd.
+  rewrite /upd_memframe /get_memframe => A m m' [i s] fr Upd.
   repeat solver; try congruence.
 Qed.
 
 Opaque Z.add.
 
-Definition alloc {A} (m:mem A) (s:Label) (fr:frame A)
+Definition alloc {A} (m:mem A) (s:Label) (fr:memframe A)
   : (block * mem A) :=
   match Map.find s m with
   | Some l =>
@@ -354,17 +354,17 @@ Proof.
 Qed.
 
 Lemma alloc_get_fresh : forall A (m m':mem A) s fr b,
-    alloc m s fr = (b,m') -> get_frame m b = None.
+    alloc m s fr = (b,m') -> get_memframe m b = None.
 Proof.
-  rewrite /alloc /get_frame => A m m' s' fr [i s] HAlloc //=.
+  rewrite /alloc /get_memframe => A m m' s' fr [i s] HAlloc //=.
   repeat solver.
 Qed.
 
-Lemma alloc_get_frame : forall A (m m':mem A) s0 fr b,
+Lemma alloc_get_memframe : forall A (m m':mem A) s0 fr b,
     alloc m s0 fr = (b,m') ->
-    forall b', get_frame m' b' = if b == b' then Some fr else get_frame m b'.
+    forall b', get_memframe m' b' = if b == b' then Some fr else get_memframe m b'.
 Proof.
-  rewrite /alloc /get_frame => A m m' s0 fr [i s] HAlloc [i' s'] //=.
+  rewrite /alloc /get_memframe => A m m' s0 fr [i s] HAlloc [i' s'] //=.
   repeat solver; try congruence.
   - apply nth_error_Z_app; auto.
   - move: (nth_error_Z_snoc l1 fr i') => [Contra | ?]; auto.
@@ -384,20 +384,20 @@ Proof.
 Qed.
 
 Lemma alloc_upd : forall A (m:mem A) b fr1 s fr2 m',
-    upd_frame m b fr1 = Some m' ->
+    upd_memframe m b fr1 = Some m' ->
     fst (alloc m' s fr2) = fst (alloc m s fr2).
 Proof.
-  rewrite /alloc /upd_frame => A m [i s] fr1 s' fr2 m' H.
+  rewrite /alloc /upd_memframe => A m [i s] fr1 s' fr2 m' H.
   repeat solver; try congruence.
   erewrite update_preserves_length_Z; eauto.
 Qed.
 
 Lemma alloc_local :
     forall A (m1 m2:mem A) s fr1 fr2,
-      (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
+      (forall b, stamp b = s -> get_memframe m1 b = get_memframe m2 b :> bool) ->
       (alloc m1 s fr1).1 = (alloc m2 s fr2).1.
 Proof.
-  rewrite /get_frame /alloc => A m1 m2 s fr1 fr2 H.
+  rewrite /get_memframe /alloc => A m1 m2 s fr1 fr2 H.
   repeat solver; simpl.
   - f_equal. f_equal.
     apply nth_error_Z_length_ext => i.
@@ -477,12 +477,12 @@ Qed.
 
 Lemma get_blocks_spec :
     forall A (labs : list Label) (mem: mem A) b,
-      (stamp b \in labs) && get_frame mem b <->
+      (stamp b \in labs) && get_memframe mem b <->
       b \in get_blocks labs mem.
 Proof.
   intros A labs mem b; split.
     - case/andP => HIn.
-      case Hget: get_frame => [fr|] //= _.
+      case Hget: get_memframe => [fr|] //= _.
       unfold get_blocks; apply/flatten_mapP.
       eexists; [eassumption|].
       unfold get_blocks_at_level. apply/mapP. exists b.1;
@@ -490,17 +490,17 @@ Proof.
       apply in_seq_Z; try omega; simpl in *.
       * apply next_pos.
       * rewrite Z.add_0_r.
-        apply get_frame_next. eexists. eassumption.
+        apply get_memframe_next. eexists. eassumption.
     - intros HIn. unfold get_blocks, get_blocks_at_level in *.
       move/flatten_mapP in HIn. destruct HIn as [l HInl HIn].
       move/mapP in HIn. destruct HIn as [z HIn Heq]. subst.
       rewrite HInl /=.
-      unfold get_frame.
+      unfold get_memframe.
       simpl in *.
       apply in_seq_Z in HIn; try omega.
-      * rewrite Z.add_0_r in HIn. apply get_frame_next in HIn.
+      * rewrite Z.add_0_r in HIn. apply get_memframe_next in HIn.
         move: HIn => [fr H].
-        rewrite /get_frame in H.
+        rewrite /get_memframe in H.
         simpl in *.
         destruct (Map.find l mem).
         + rewrite H; auto.
@@ -508,48 +508,48 @@ Proof.
       * apply next_pos.
 Qed.
 
-Lemma alloc_get_frame_old :
-  forall T mem (stamp : Label) (f f' : frame T) b b' mem'
+Lemma alloc_get_memframe_old :
+  forall T mem (stamp : Label) (f f' : memframe T) b b' mem'
          (ALLOC : alloc mem stamp f' = (b', mem'))
-         (FRAME : get_frame mem b = Some f),
-    get_frame mem' b = Some f.
+         (MEMFRAME : get_memframe mem b = Some f),
+    get_memframe mem' b = Some f.
 Proof.
   intros.
-  erewrite alloc_get_frame; eauto.
+  erewrite alloc_get_memframe; eauto.
   have [e|//] := altP (b' =P b).
   exploit alloc_get_fresh; eauto.
   congruence.
 Qed.
 
-Lemma alloc_get_frame_new :
-  forall T mem (stamp : Label) (frame : frame T) b mem'
-         (ALLOC : alloc mem stamp frame = (b, mem')),
-    get_frame mem' b = Some frame.
+Lemma alloc_get_memframe_new :
+  forall T mem (stamp : Label) (memframe : memframe T) b mem'
+         (ALLOC : alloc mem stamp memframe = (b, mem')),
+    get_memframe mem' b = Some memframe.
 Proof.
   intros.
-  erewrite alloc_get_frame; eauto.
+  erewrite alloc_get_memframe; eauto.
   by rewrite eqxx; simpl in *; auto.
 Qed.
 
-Lemma get_frame_upd_frame_eq :
+Lemma get_memframe_upd_memframe_eq :
   forall T 
          (m : mem T) b f m'
-         (UPD : upd_frame m b f = Some m'),
-    get_frame m' b = Some f.
+         (UPD : upd_memframe m b f = Some m'),
+    get_memframe m' b = Some f.
 Proof.
   intros.
-  erewrite get_upd_frame; eauto.
+  erewrite get_upd_memframe; eauto.
   by rewrite eqxx.
 Qed.
 
-Lemma get_frame_upd_frame_neq :
+Lemma get_memframe_upd_memframe_neq :
   forall T 
          (m : mem T) b b' f m'
-         (UPD : upd_frame m b f = Some m')
+         (UPD : upd_memframe m b f = Some m')
          (NEQ : b' <> b),
-    get_frame m' b' = get_frame m b'.
+    get_memframe m' b' = get_memframe m b'.
 Proof.
   intros.
-  erewrite get_upd_frame; eauto.
+  erewrite get_upd_memframe; eauto.
   have [?|?] := (b =P b'); simpl in *; congruence.
 Qed.

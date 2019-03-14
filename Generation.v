@@ -375,10 +375,10 @@ Instance smart_vary_frame : SmartVary frame :=
    corresponding frame *)
 Definition handle_single_mframe obs inf (m : memory) (mf : mframe)
 : G memory :=
-  match get_frame m mf with
+  match get_memframe m mf with
     | Some f =>
       bindGen (smart_vary obs inf f) (fun f' =>
-      match upd_frame m mf f' with
+      match upd_memframe m mf f' with
         | Some m' => returnGen m'
         | None    => returnGen m
       end)
@@ -544,10 +544,10 @@ Definition failed_state : State :=
                  (St [::] (Memory.empty Atom) (ST [::]) [::] (PAtm Z0 bot)).
 
 Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
-  match get_frame m mf with
+  match get_memframe m mf with
     | Some (Fr lab data) =>
       bindGen (vectorOf (length data) (smart_gen inf)) (fun data' =>
-      match upd_frame m mf (Fr lab data') with
+      match upd_memframe m mf (Fr lab data') with
         | Some m' => returnGen m'
         | _ => pure m
       end)
@@ -567,7 +567,7 @@ Definition get_blocks_and_sizes (m : memory) :=
   map
     (fun b =>
     let length :=
-        match get_frame m b with
+        match get_memframe m b with
           | Some fr =>
             let 'Fr _ data := fr in length data
           | _ => 0
@@ -622,23 +622,28 @@ Instance shrBinOpT : Shrink BinOpT :=
 
 (* Arbitrary version *)
 
-  Derive GenSized for Instr.
-  Derive GenSized for Pointer.
-  Derive GenSized for Value.
-  Derive GenSized for Atom.
-  Derive GenSized for Ptr_atom.
-  Derive GenSized for StackFrame.
-  Derive GenSized for Stack.
-  Derive GenSized for State.
-  Derive GenSized for Variation.
+Derive GenSized for Instr.
+Derive GenSized for Pointer.
+Derive GenSized for Value.
+Derive GenSized for Atom.
+Derive GenSized for Ptr_atom.
+Derive GenSized for StackFrame.
+Derive GenSized for Stack.
+Derive GenSized for State.
+Derive GenSized for Variation.
+  
+Derive Fuzzy for BinOpT.
+Derive Fuzzy for Instr.
+Derive Fuzzy for Pointer.
+Derive Fuzzy for Value.
+Derive Fuzzy for Atom.
+Derive Fuzzy for Ptr_atom.
+Derive Fuzzy for StackFrame.
+Derive Fuzzy for Stack.
+Derive Fuzzy for State.
+Derive Fuzzy for Variation.
 
-  Derive Fuzzy for BinOpT.
-  Derive Fuzzy for Instr.
-  Derive Fuzzy for Pointer.
-  Derive Fuzzy for Value.
-  Derive Fuzzy for Atom.
-  Derive Fuzzy for Ptr_atom.
-  Derive Fuzzy for StackFrame.
-  Derive Fuzzy for Stack.
-  Derive Fuzzy for State.
-  Derive Fuzzy for Variation.
+Definition gen_variation_copy : G (@Variation State) :=
+  bindGen arbitrary (fun l  =>
+  bindGen arbitrary (fun st => 
+  returnGen (Var l st st))).

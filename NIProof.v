@@ -210,7 +210,7 @@ Definition root_set obs (st : State) : {set mframe} :=
   root_set_registers obs r ∂pc :|: root_set_stack obs (unStack s).
 
 Definition link obs (mem : memory) (f1 f2 : mframe) :=
-  if get_frame mem f1 is Some (Fr l atoms) then
+  if get_memframe mem f1 is Some (Fr l atoms) then
     isLow l obs && (f2 \in mframes_from_atoms obs atoms)
   else false.
 
@@ -243,18 +243,18 @@ apply/eq_connect=> x y.
 rewrite /link.
 have [<-|neq_fpx] := fp =P x.
   (* How about using implicit arguments? *)
-  rewrite (alloc_get_frame_eq _ _ _ _ _ alloc_sz) inE /=.
+  rewrite (alloc_get_memframe_eq _ _ _ _ _ alloc_sz) inE /=.
   rewrite (alloc_get_fresh alloc_sz).
   set s := filter _ _.
   suff /eqP->: s == [::] by rewrite andbF.
   by rewrite -[_ == _]negbK -has_filter has_nseq andbF.
-by rewrite (alloc_get_frame_neq _ _ _ _ _ _ alloc_sz neq_fpx).
+by rewrite (alloc_get_memframe_neq _ _ _ _ _ _ alloc_sz neq_fpx).
 Qed.
 
 Arguments reachable_alloc_int [μ μ' sz lab stamp i li fp l f1 f2] _.
 
 Lemma reachable_upd μ μ' pv lf fr l f1 f2 :
-  upd_frame μ pv (Fr lf fr) = Some μ' ->
+  upd_memframe μ pv (Fr lf fr) = Some μ' ->
   reachable l μ' f1 f2 -> reachable l μ f1 f2
   \/ isLow lf l /\ reachable l μ f1 pv
     /\ exists f3, f3 \in mframes_from_atoms l fr /\ reachable l μ f3 f2.
@@ -263,7 +263,7 @@ Proof.
 move=> upd_pv /connectP [p] /(@shortenP _ _ f1) [p'].
 have link_not_pv: forall (f : mframe), pv != f -> link l μ' f =1 link l μ f.
   move=> f; rewrite eq_sym => /eqP neq_pv f'; rewrite /link.
-  by rewrite (get_frame_upd_frame_neq upd_pv neq_pv).
+  by rewrite (get_memframe_upd_memframe_neq upd_pv neq_pv).
 have path_not_pv: forall (p : seq mframe) f, pv \notin belast f p -> path (link l μ') f p = path (link l μ) f p.
   elim=> //= x s IHs f.
   rewrite inE negb_or.
@@ -277,7 +277,7 @@ have [in_path|] := boolP (pv \in f1 :: p').
   rewrite cat_path last_p1 -cat_cons [f1 :: p1]lastI last_p1 cat_uniq last_cat.
   rewrite rcons_uniq.
   case/andP=> path_p1 path_p2 /and3P [/andP [? _] not_pv _] _ /= ->; right.
-  rewrite /= {1}/link (get_frame_upd_frame_eq upd_pv) in path_p2.
+  rewrite /= {1}/link (get_memframe_upd_memframe_eq upd_pv) in path_p2.
   case/andP: path_p2 => /andP [low_lf ref_f3] path_p2; split=> //; split.
     by apply/connectP; exists p1=> //; rewrite -path_not_pv.
   exists f3; split => //; apply/connectP; exists p2 => //.
@@ -407,7 +407,7 @@ case: {st st'} step.
     move/eqP=> -> reach_f2.
     apply: (wf_st l pv f2); first by rewrite inE (root_set_registers_nth get_r1).
     apply/(connect_trans _ reach_f2)/connect1; move: load_p mlab_p.
-    rewrite /link /=; case: (get_frame μ pv) => // [[? fr]] get_pl [->].
+    rewrite /link /=; case: (get_memframe μ pv) => // [[? fr]] get_pl [->].
     apply/andP; split=> //.
     exact: (mframes_from_atoms_nth get_pl).
   by apply: wf_st; rewrite inE in_stack_f1 orbT.
@@ -415,7 +415,7 @@ case: {st st'} step.
 + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
   rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
   case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-  case get_fp: (get_frame μ fp) lab_p => // [[? fr]] [eq_lf].
+  case get_fp: (get_memframe μ fp) lab_p => // [[? fr]] [eq_lf].
   rewrite eq_lf in get_fp *.
   case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
@@ -434,7 +434,7 @@ case: {st st'} step.
 + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
   rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
   case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-  case get_fp: (get_frame μ fp) lab_fp => // [[? fr]] [eq_lf].
+  case get_fp: (get_memframe μ fp) lab_fp => // [[? fr]] [eq_lf].
   rewrite eq_lf in get_fp *.
   case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp wf_st l f1 f2.
   rewrite inE /= => H.
@@ -755,8 +755,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       move=> /eqP [<-] {p2}.
       case/and3P: indist_s1s2=> /= [_ /andP [/allP im1m2 _] _] mlab_p2.
       case: p mlab_p mlab_p2 get_r1 => [b off] /=.
-      case get_b: (get_frame μ b) => [[C' vs]|] //= [e]; subst C'.
-      case get_b2: (get_frame μ2 b) => [[C2' vs2]|] //= [e] get_r1; subst C2'.
+      case get_b: (get_memframe μ b) => [[C' vs]|] //= [e]; subst C'.
+      case get_b2: (get_memframe μ2 b) => [[C2' vs2]|] //= [e] get_r1; subst C2'.
       have b_low: flows (Memory.stamp b) obs.
         apply: (wf_s1 obs b b).
           apply/setUP; left.
@@ -894,8 +894,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       move=> μ1 μ2 μ1' μ2' L1 L2 dfp1 dfp2 fr1 fr2 /allP ind hi1 hi2 H1 H2.
       apply/allP=> b.
       rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter all_labels_correct.
-      rewrite andbT (Memory.alloc_get_frame H1) => /andP [low_b].
-      rewrite (alloc_get_frame H2).
+      rewrite andbT (Memory.alloc_get_memframe H1) => /andP [low_b].
+      rewrite (alloc_get_memframe H2).
       move: low_b; have [<-{b}|] := altP (dfp1 =P b).
         by rewrite (alloc_stamp H1) (negbTE hi1).
       have [<-{b}|ne1 ne2 low_b get_b] := altP (dfp2 =P b).
@@ -911,20 +911,20 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
           rewrite -[dfp]/(dfp, μ').1 -[dfp2]/(dfp2,μ2').1 -Halloc -Halloc2.
           apply: alloc_local => b Hb.
           apply/(sameP idP)/(iffP idP).
-            case get_b: get_frame=> [fr|] //= _.
+            case get_b: get_memframe=> [fr|] //= _.
             case/andP: indist_μ=> [_ /allP indist_μ].
             have /(indist_μ b) : b \in blocks_stamped_below obs μ2.
               rewrite /blocks_stamped_below -get_blocks_spec get_b.
               rewrite /allThingsBelow mem_filter all_labels_correct Hb.
               by rewrite !flows_join low_K low_K' low_pc.
-            by rewrite get_b; case: get_frame.
-          case get_b: get_frame=> [fr|] //= _.
+            by rewrite get_b; case: get_memframe.
+          case get_b: get_memframe=> [fr|] //= _.
           case/andP: indist_μ=> [/allP indist_μ _].
           have /(indist_μ b) : b \in blocks_stamped_below obs μ.
             rewrite /blocks_stamped_below -get_blocks_spec get_b.
             rewrite /allThingsBelow mem_filter all_labels_correct Hb.
             by rewrite !flows_join low_K low_K' low_pc.
-          by rewrite get_b; case: get_frame.
+          by rewrite get_b; case: get_memframe.
         subst dfp2.
         have ind: indist obs (Vptr (Ptr dfp 0) @ K \_/ K') (Vptr (Ptr dfp 0) @ K \_/ K').
           exact: indistxx.
@@ -939,8 +939,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
           move=> μ1 μ2 μ1' μ2' L dfp fr /allP ind H1 H2.
           apply/allP=> b.
           rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter all_labels_correct.
-          rewrite andbT (alloc_get_frame H1) => /andP [low_b].
-          rewrite (alloc_get_frame H2).
+          rewrite andbT (alloc_get_memframe H1) => /andP [low_b].
+          rewrite (alloc_get_memframe H2).
           move: low_b; have [<-{b}|ne low_b get_b] := altP (dfp =P b); first by rewrite indistxx.
           suff /(ind b): b \in blocks_stamped_below obs μ1 by [].
           rewrite /blocks_stamped_below /allThingsBelow -get_blocks_spec.
@@ -979,9 +979,9 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     case get_r1': registerContent=> [[[|[pv' pl']|] K']|] //=.
     have /= [a] := indist_registerContent indist_s1s2 low_pc1 get_r1.
     rewrite get_r1' => - [<-] {a} /andP [/eqP eK indist_p]; subst K'.
-    case get_pv: (get_frame μ pv) load_p mlab_p => [[fl fr]|] //= load_p [eC].
+    case get_pv: (get_memframe μ pv) load_p mlab_p => [[fl fr]|] //= load_p [eC].
     subst fl.
-    case get_pv': get_frame=> [[C' fr']|] //=.
+    case get_pv': get_memframe=> [[C' fr']|] //=.
     case load_p': nth_error_Z=> [[v' Ll']|] //=.
     rewrite /Vector.nth_order /=.
     case upd_r2': registerUpdate=> [rs2'|] //= [<-] {s2'}.
@@ -999,7 +999,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       rewrite /root_set; apply/setUP; left=> /=.
       rewrite /root_set_registers low_pc1.
       by apply: (mframes_from_atoms_nth get_r1 low_K).
-    have: indist obs (get_frame μ pv) (get_frame μ2 pv).
+    have: indist obs (get_memframe μ pv) (get_memframe μ2 pv).
       case/orP: low_C=> [low_C|low_C].
         case/andP: ind_μ => [/allP/(_ pv) ind _]; apply: ind.
         rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter all_labels_correct.
@@ -1023,7 +1023,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> /= CODE get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (get_frame μ fp) lab_p => // [[lf' fr]] [eq_lf]; subst lf'.
+    case get_fp: (get_memframe μ fp) lab_p => // [[lf' fr]] [eq_lf]; subst lf'.
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp low_pc1 indist_s1s2 wf_s1.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2
@@ -1032,13 +1032,13 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have /= [[v2 K2 get_r2' // /andP [/eqP eK indist_i]]] :=
       indist_registerContent indist_s1s2 low_pc1 get_r2.
     subst K2; rewrite get_r2'.
-    case get_fp': get_frame=> [[lf2 fr2]|] //=.
+    case get_fp': get_memframe=> [[lf2 fr2]|] //=.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     move: indist_s1s2 (indist_s1s2).
     rewrite {1}indist_low_pc //= => /and5P [? ind_μ ? /eqP [? ?] ind_rs] indist_s1s2; subst j2 LPC2.
     rewrite flows_join; case: ifP => // /andP [low_K' low_lpc'].
     case upd_i': update_list_Z => [fr2'|] //=.
-    case upd_fp': upd_frame => /= [μ2'|] //= [<-] {s2'}.
+    case upd_fp': upd_memframe => /= [μ2'|] //= [<-] {s2'}.
     rewrite /indist /= low_pc1 /=; apply/and5P; split=> //.
     move: (indist_registerContent_aux r1 ind_rs).
     rewrite get_r1 get_r1' => /andP [/eqP ?]; subst lp.
@@ -1046,7 +1046,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       have hi_lf: isHigh lf obs by apply: contra hi_K''; apply: flows_trans.
       have hi_lf2: isHigh lf2 obs by apply: contra hi_K''; apply: flows_trans.
       apply/indistMemP=> b low_b.
-      rewrite (get_upd_frame upd_fp) (get_upd_frame upd_fp').
+      rewrite (get_upd_memframe upd_fp) (get_upd_memframe upd_fp').
       case: (altP eqP) => [? _|ne].
         subst b.
         case: (altP eqP)=> [?| ne'].
@@ -1061,14 +1061,14 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
         move: H.
         rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter low_b all_labels_correct /=.
         rewrite get_fp=> /(_ erefl).
-        case: get_frame=> [[lf'' fr'']|] // /andP [/eqP <-] _.
+        case: get_memframe=> [[lf'' fr'']|] // /andP [/eqP <-] _.
         by rewrite /indist /= /indist /= eqxx hi_lf.
       case: (altP eqP)=> [?| ne' def].
         subst b.
         case/andP: ind_μ=> [_ /allP/(_ pv')].
         rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter low_b all_labels_correct /=.
         rewrite get_fp' indist_sym => /(_ erefl).
-        case: get_frame => [[lf'' fr'']|] //= /andP [/eqP ?] _ _; subst lf''.
+        case: get_memframe => [[lf'' fr'']|] //= /andP [/eqP ?] _ _; subst lf''.
         by rewrite /indist /= /indist /= eqxx hi_lf2.
       case/orP: def=> [def|def].
         case/andP: ind_μ=> [/allP/(_ b)].
@@ -1080,7 +1080,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       by eauto.
     subst pv' pl'.
     apply/indistMemP=> b low_b.
-    rewrite (get_upd_frame upd_fp) (get_upd_frame upd_fp').
+    rewrite (get_upd_memframe upd_fp) (get_upd_memframe upd_fp').
     case: (altP eqP) => [? _|ne].
       subst b.
       case/andP: ind_μ => [/allP/(_ fp)].
@@ -1112,7 +1112,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> /= CODE get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (get_frame μ fp) load_fp lab_fp => // [[lf' fr]] load_fp [eq_lf]; subst lf'.
+    case get_fp: (get_memframe μ fp) load_fp lab_fp => // [[lf' fr]] load_fp [eq_lf]; subst lf'.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp low_pc1 indist_s1s2.
     rewrite /fstep -(indist_instr indist_s1s2) /state_instr_lookup //= CODE /=.
     case: s2 wf_s2 indist_s1s2
@@ -1121,7 +1121,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have /= [[v2 K2 get_r2' // /andP [/eqP eK indist_i]]] :=
       indist_registerContent indist_s1s2 low_pc1 get_r2.
     subst K2; rewrite get_r2'.
-    case get_fp': get_frame=> [[lf2 fr2]|] //=.
+    case get_fp': get_memframe=> [[lf2 fr2]|] //=.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     move: indist_s1s2 (indist_s1s2).
     rewrite {1}indist_low_pc //= => /and5P [? ind_μ ? /eqP [? ?] ind_rs] indist_s1s2; subst j2 LPC2.
@@ -1129,7 +1129,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     case load_fp': nth_error_Z => [[v2' lv2']|] //=.
     rewrite !flows_join; case: ifP => // /andP [/andP [low_lpc' low_K'] low_lv'].
     case upd_i': update_list_Z => [fr2'|] //=.
-    case upd_fp': upd_frame => /= [μ2'|] //= [<-] {s2'}.
+    case upd_fp': upd_memframe => /= [μ2'|] //= [<-] {s2'}.
     rewrite /indist /= low_pc1 /=; apply/and5P; split=> //.
     move: (indist_registerContent_aux r1 ind_rs).
     rewrite get_r1 get_r1' => /andP [/eqP ?]; subst lp.
@@ -1137,7 +1137,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       have hi_lf: isHigh (lf \_/ lv') obs by apply: contra hi_K''; apply: flows_trans.
       have hi_lf2: isHigh (lf2 \_/ lv2') obs by apply: contra hi_K''; apply: flows_trans.
       apply/indistMemP=> b low_b.
-      rewrite (get_upd_frame upd_fp) (get_upd_frame upd_fp').
+      rewrite (get_upd_memframe upd_fp) (get_upd_memframe upd_fp').
       case: (altP eqP) => [? _|ne].
         subst b.
         case: (altP eqP)=> [?| ne'].
@@ -1196,7 +1196,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
         move: H.
         rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter low_b all_labels_correct /=.
         rewrite get_fp=> /(_ erefl).
-        case: get_frame=> [[lf'' fr'']|] // /andP [/eqP <-] ind_fr.
+        case: get_memframe=> [[lf'' fr'']|] // /andP [/eqP <-] ind_fr.
         rewrite /indist /= /indist /= eqxx /=.
         rewrite -implybE; apply/implyP => low_lf.
         move: hi_lf; rewrite flows_join low_lf /= => hi_lv'.
@@ -1219,7 +1219,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
         case/andP: ind_μ=> [_ /allP/(_ pv')].
         rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow mem_filter low_b all_labels_correct /=.
         rewrite get_fp' indist_sym => /(_ erefl).
-        case: get_frame => [[lf'' fr'']|] //= /andP [/eqP ?] ind_fr _; subst lf''.
+        case: get_memframe => [[lf'' fr'']|] //= /andP [/eqP ?] ind_fr _; subst lf''.
         rewrite /indist /= /indist /= eqxx /=.
         rewrite -implybE; apply/implyP => low_lf.
         move: hi_lf2; rewrite flows_join low_lf /= => hi_lv2'.
@@ -1247,7 +1247,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       by eauto.
     subst pv' pl'.
     apply/indistMemP=> b low_b.
-    rewrite (get_upd_frame upd_fp) (get_upd_frame upd_fp').
+    rewrite (get_upd_memframe upd_fp) (get_upd_memframe upd_fp').
     case: (altP eqP) => [? _|ne].
       subst b.
       case/andP: ind_μ => [/allP/(_ fp)].
@@ -1394,8 +1394,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have /= [[v1' K2] -> /andP [/eqP <- indist_v1]] :=
       indist_registerContent indist_s1s2 low_pc1 get_r1.
     case: v1' indist_v1 => [] // [b' off'] /= indist_p'.
-    move get_frame_b: (get_frame μ b) lab_p size_p => [[lab fr]|//] [?] [?]; subst lab n.
-    case get_frame_b': (get_frame μ2 b') => //= [[C' fr']] /=.
+    move get_memframe_b: (get_memframe μ b) lab_p size_p => [[lab fr]|//] [?] [?]; subst lab n.
+    case get_memframe_b': (get_memframe μ2 b') => //= [[C' fr']] /=.
     rewrite /Vector.nth_order /=.
     case upd_r2': (registerUpdate rs2 r2 _) => //= [r2'].
     case: s2' => im2' μ2' σ2' r2'' pc2' [<- <- <- <- <-]; clear im2' μ2' σ2' r2'' pc2'.
@@ -1412,7 +1412,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
           => /andP [/allP/(_ b) indist_get _].
         have bsb: b \in blocks_stamped_below obs μ. {
           rewrite /blocks_stamped_below /allThingsBelow -get_blocks_spec mem_filter.
-          rewrite get_frame_b all_labels_correct /= !andbT.
+          rewrite get_memframe_b all_labels_correct /= !andbT.
           move: wf_s1; rewrite /well_stamped /well_stamped_label => wf_s1.
           apply wf_s1 with (f1 := b) => /=.
           - rewrite in_setU /=; apply/orP; left.
@@ -1420,7 +1420,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
           - by rewrite /reachable; apply connect0.
         }
         move: indist_get => /(_ bsb).
-        rewrite /indist /= /indist /= get_frame_b get_frame_b'
+        rewrite /indist /= /indist /= get_memframe_b get_memframe_b'
           => /andP [eq_C /orP [high_C | indist_fr]];
           apply/andP; split=>//.
         - by rewrite high_C.
@@ -1501,7 +1501,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     have high_L: isHigh (K \_/ (K' \_/ LPC)) o by rewrite !flows_join (negbTE high_pc) !andbF.
     apply/andP; split; apply/allP=> /= b;
     rewrite /blocks_stamped_below /allThingsBelow -get_blocks_spec
-            mem_filter all_labels_correct andbT (alloc_get_frame alloc_i);
+            mem_filter all_labels_correct andbT (alloc_get_memframe alloc_i);
     have [<-{b}|ne] := altP eqP;
     by rewrite ?indistxx // (alloc_stamp alloc_i) (negbTE high_L).
   (* Load *)
@@ -1512,13 +1512,13 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl lp lf lv -> ? get_r1 get_r2 /= lab_p.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite flows_join; case/andP => low_lp_lf low_LPC_lf [<- <-].
-    case get_fp: (get_frame μ fp) lab_p => // [[lf' fr]] [eq_lf].
+    case get_fp: (get_memframe μ fp) lab_p => // [[lf' fr]] [eq_lf].
     rewrite {}eq_lf {lf'} in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv)) => [fr'|] // upd_fp high_pc _.
     rewrite /indist /= (negbTE high_pc) /= 2!indistxx andbT /=.
     apply/andP; split; apply/allP=> /= b;
     rewrite /blocks_stamped_below /allThingsBelow -get_blocks_spec
-            mem_filter all_labels_correct andbT (get_upd_frame upd_fp);
+            mem_filter all_labels_correct andbT (get_upd_memframe upd_fp);
     have [<-{b}|ne] := altP eqP;
     rewrite ?get_fp /= ?indistxx // andbT /indist /= /indist /= eqxx /= -implybE => _;
     apply/implyP => low_lf;
@@ -1527,7 +1527,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ σ pc v [fp i] μ' r r1 r2 j LPC rpcl rl v' lp lv lv' lf -> ? get_r1 get_r2 /= load_fp lab_fp.
     rewrite /run_tmr /= /apply_rule /= /Vector.nth_order /=.
     case: ifP => //; rewrite !flows_join=> /andP [/andP [low_LPC low_lp] low_lv] [<- <-].
-    case get_fp: (get_frame μ fp) load_fp lab_fp => // [[lf' fr]] load_fp [eq_lf].
+    case get_fp: (get_memframe μ fp) load_fp lab_fp => // [[lf' fr]] load_fp [eq_lf].
     rewrite {}eq_lf {lf'} in get_fp *.
     case upd_i: (update_list_Z fr i (v @ lv')) => [fr'|] // upd_fp high_pc _.
     rewrite /indist /= (negbTE high_pc) /= 2!indistxx andbT /=.
@@ -1545,7 +1545,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
       by rewrite indist_cons indistxx /=; eauto.
     apply/andP; split; apply/allP=> /= b;
     rewrite /blocks_stamped_below /allThingsBelow -get_blocks_spec
-            mem_filter all_labels_correct andbT (get_upd_frame upd_fp);
+            mem_filter all_labels_correct andbT (get_upd_memframe upd_fp);
     have [<-{b}|ne] := altP eqP;
     by rewrite ?get_fp /= ?indistxx // andbT /indist /= indist_sym.
   (* Jump *)

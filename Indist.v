@@ -116,7 +116,7 @@ Definition blocks_stamped_below (lab : Label) (m : memory) : seq mframe :=
 
 Definition indistMemAsym lab m1 m2 :=
   all (fun b =>
-         indist lab (get_frame m1 b) (get_frame m2 b))
+         indist lab (get_memframe m1 b) (get_memframe m2 b))
       (blocks_stamped_below lab m1).
 
 Instance indistMem : Indist memory :=
@@ -133,8 +133,8 @@ Defined.
 
 Lemma indistMemP lab m1 m2 :
   (forall b, isLow (stamp b) lab ->
-             get_frame m1 b || get_frame m2 b ->
-             indist lab (get_frame m1 b) (get_frame m2 b)) ->
+             get_memframe m1 b || get_memframe m2 b ->
+             indist lab (get_memframe m1 b) (get_memframe m2 b)) ->
   indist lab m1 m2.
 Proof.
 move=> H; apply/andP; split; apply/allP=> b;
