@@ -861,6 +861,15 @@ Proof.
       * inv H.
 Qed.
 
+Lemma update_preserves_length_Z : forall T a (vl:T) m m',
+  update_list_Z m a vl = Some m' ->
+  length m' = length m.
+Proof.
+  rewrite /update_list_Z => T a vl m m' H.
+  destruct (a <? 0)%Z; try congruence.
+  eapply update_preserves_length; eauto.
+Qed.
+  
 Lemma app_same_length_eq (T: Type): forall (l1 l2 l3 l4: list T),
   l1++l2 = l3++l4 ->
   length l1 = length l3 ->
@@ -1033,6 +1042,17 @@ Lemma nth_error_app :
 Proof.
   induction n as [|n IH]; intros [|x' l1] l2 x H; simpl in *;
   try solve [inv H]; auto.
+Qed.
+
+Lemma nth_error_snoc :
+  forall T (l : list T) x i,
+    i = length l \/ nth_error (l ++ [:: x]) i = nth_error l i.
+Proof.
+  move => T l; induction l=> x i; destruct i; simpl in *; auto.
+  - right; destruct i; auto. 
+  - destruct (Nat.eq_dec i (length l)).
+    + left; auto.
+    + edestruct IHl as [? | ?]; eauto.
 Qed.
 
 Lemma update_list_app :
@@ -1225,4 +1245,30 @@ Proof.
     + destruct n; simpl in *; auto.
     + destruct n; simpl in *; auto.
       * congruence.
+Qed.
+
+Lemma nth_error_length_none : forall {A} (l: list A), nth_error l (length l) = None.
+Proof.  
+  move => A l; induction l; simpl; auto.
+Qed.
+
+Lemma nth_error_Z_length_none :
+  forall {A} (l : list A),
+    nth_error_Z l (Z.of_nat (length l)) = None.
+Proof.
+  move => A l.
+  rewrite /nth_error_Z.
+  destruct ((Z.of_nat (length l) <? 0)%Z); auto.
+  rewrite Nat2Z.id.
+  apply nth_error_length_none.
+Qed.
+
+Lemma nth_error_Z_snoc : forall (T : Type) (l : seq T) (x : T) (i : Z),
+       i = Z.of_nat (length l) \/ nth_error_Z (l ++ [:: x]) i = nth_error_Z l i.
+Proof.
+  rewrite /nth_error_Z => T l x i.
+  destruct (i <? 0)%Z eqn:I; auto.
+  move: (nth_error_snoc l x (Z.to_nat i)) => [Eq | Eq].
+  - left; rewrite -Eq. symmetry. apply Z2Nat.id. apply Z.ltb_ge. auto.
+  - right; auto.
 Qed.

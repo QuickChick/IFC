@@ -13,8 +13,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 (* I'm ending the craziness. Label model is now fixed to be Lab4. *)
-Inductive alloc_mode := Global | Local.
-
 Inductive frame A := Fr (lab : Label) : seq A -> frame A.
 
 Section FrameEqType.
@@ -235,22 +233,6 @@ Definition upd_frame {A} (m:mem A) (b:block) (fr:frame A) : option (mem A) :=
     end
   end.
 
-Lemma upd_get_frame : forall A (m:mem A) (b:block) fr fr',
-    get_frame m b = Some fr ->
-    exists m', upd_frame m b fr' = Some m'.
-Proof.
-  rewrite /upd_frame /get_frame => A m b fr fr' HGet.
-  destruct (Map.find b.2 m) eqn:Find.
-  - apply valid_update with (x':= fr') in HGet.
-    move: HGet => [l' Hl'].
-    destruct b as [i s]; simpl in *.
-    exists (Map.add s l' m).
-    rewrite Find.
-    rewrite Hl'.
-    auto.
-  - congruence.
-Qed.
-
 Lemma eq_refl_false : forall (A : eqType) (x : A), x == x = false -> False.
 Proof. 
   move => A x H.
@@ -258,196 +240,164 @@ Proof.
   congruence.
 Qed.  
 
+Lemma eq_refl_false_2 : forall (A : eqType) (x y : A), x == y = false -> x <> y.
+Proof. 
+  move => A x y H Contra; subst.
+  eapply eq_refl_false; eauto.
+Qed.  
+
+Lemma eq_refl_true : forall (A : eqType) (x y : A), x == y = true -> x = y.
+Proof. 
+  move => A x y H.
+  apply /eqP; auto.
+Qed.  
+
+Hint Resolve
+     update_list_Z_spec
+     update_list_Z_spec3
+     nth_error_Z_length_none
+  : listZ.
+
+Ltac solver :=
+    simpl in *;
+    match goal with
+    (* Destruct across matches and equalities to simplify terms. *)
+    | [ H : context [match ?X with | Some _ => _ | None => _ end] |- _ ]  =>
+      let C := fresh "Case" in
+      destruct X eqn:C
+    | [ |- context [match ?X with | Some _ => _ | None => _ end] ]  =>
+      let C := fresh "Case" in
+      destruct X eqn:C
+    | [ |- context [if @eq_op ?EqT ?X ?Y then _ else _] ] =>
+      let C := fresh "Eq" in
+      destruct (@eq_op EqT X Y) eqn:C
+    | [ H : context[Map.E.eq_dec ?S1 ?S2] |- _ ] =>
+      destruct (Map.E.eq_dec S1 S2); subst
+    (* Reflect equalities for subst. *)
+    | [ H : (?X == ?Y) = true |- _ ] => apply eq_refl_true in H; inv H
+    (* Some is injective *)       
+    | [ H : Some ?X = Some ?Y |- _ ] => inv H
+    | [ H : (_,_) = (_,_) |- _ ] => inv H
+    (* Rewrite hypotheses with the same LHS. *)
+    | [ H1 : ?X = Some ?Y1, H2 : ?X = Some ?Y2 |- _ ] =>
+      rewrite H1 in H2; inv H2
+    | [ H1 : ?X = Some ?Y1, H2 : ?X = None |- _ ] =>
+      rewrite H1 in H2; inv H2
+    (* Rewrite the find s (add s' m) pattern *)
+    | [ H : context[Map.find ?S1 (Map.add ?S2 _ _)] |- _ ] =>
+      rewrite MapFacts.add_o in H
+    (* Discharge some easy contradictions. *)
+    | [ H : (?X == ?X) = false |- _ ] => apply eq_refl_false in H; inv H
+    | [ H : ?S <> ?S |- _ ] => exfalso; apply H; auto
+    (* Lift inequality of pairs to inequality of first projection if possible. *)
+    | [ H : (?I1, ?S) == (?I2, ?S) = false |- _ ] =>
+      let N := fresh "NEq" in
+      assert (N: I1 <> I2) by (move => ?; subst; apply eq_refl_false in H; inv H);
+      clear H
+    (* Resolve with spec2 to avoid infinite symmetry loop *)
+    | [ H1 : update_list_Z ?L2 ?I ?Fr = Some ?L1
+      , H2 : ?I1 <> ?I2
+      |- nth_error_Z ?L1 ?I2 = nth_error_Z ?L2 ?I2 ] =>
+      eapply update_list_Z_spec2 in H1; eauto
+    (* Resolve contradiction using valid_update *)
+    | [ H1 : nth_error_Z ?L ?I = Some _
+      , H2 : update_list_Z ?L ?I ?Fr = None
+      |- _ ] => apply valid_update with (x' := Fr) in H1; move: H1 => [? ?]
+    end;
+    (* Finish with eauto + list_Z hint database *)
+    eauto with listZ.
+
+Lemma upd_get_frame : forall A (m:mem A) (b:block) fr fr',
+    get_frame m b = Some fr ->
+    exists m', upd_frame m b fr' = Some m'.
+Proof.
+  rewrite /upd_frame /get_frame => A m [i s] fr fr' HGet; simpl in *.
+  repeat solver; try congruence.
+Qed.
+
 Lemma get_upd_frame : forall A (m m':mem A) (b:block) fr,
     upd_frame m b fr = Some m' ->
     forall b',
       get_frame m' b' = if b == b' then Some fr else get_frame m b'.
 Proof.
   rewrite /upd_frame /get_frame => A m m' [i s] fr Hupd [i' s'] //=.
-  destruct (Map.find s m) as [l|] eqn:Find;
-  destruct (Map.find s' m') as [l'|] eqn:Find';
-  destruct (@eq_op block_eqType (i, s) (i', s')) eqn:Eq;
-  simpl in *; auto; try congruence.
-  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
-    assert (H: @eq block (i,s) (i', s')) by (apply /eqP; auto); inv H.
-    inv Hupd.
-    apply Map.find_2 in Find'.
-    apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? ?]]; [subst |congruence].
-    eapply update_list_Z_spec; eauto.
-  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
-    inv Hupd.
-    destruct (s == s') eqn:HS.
-    + assert (H : s = s') by (apply /eqP; auto); inv H.
-      rewrite Find.
-      apply Map.find_2 in Find'.
-      apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? ?]]; [subst |congruence].
-      destruct (i == i') eqn:HI.
-      * assert (H' : i = i') by (apply /eqP; auto); inv H'.
-        apply eq_refl_false in Eq; inv Eq.
-      * assert (i <> i').
-        { move => ?; subst; apply eq_refl_false in Eq; inv Eq. }
-        eapply update_list_Z_spec2 in Upd; eauto.
-    + apply Map.find_2 in Find'.
-      apply MapFacts.add_mapsto_iff in Find' as [[? ?] | [? Find']]; subst;
-      [ apply eq_refl_false in HS; inv HS |] .
-      apply Map.find_1 in Find'.
-      rewrite Find'.
-      auto.
-  - assert (H: @eq block (i,s) (i', s')) by (apply /eqP; auto); inv H.
-    destruct (update_list_Z l i' fr) as [l'' |] eqn:Upd; try congruence.
-    inv Hupd.
-    rewrite MapFacts.add_o in Find'.
-    destruct (Map.E.eq_dec s' s'); subst; try congruence.
-  - destruct (update_list_Z l i fr) as [l'' |] eqn:Upd; try congruence.
-    inv Hupd.
-    destruct (s == s') eqn:HS.
-    + assert (H : s = s') by (apply /eqP; auto); inv H.
-      rewrite MapFacts.add_o in Find'.
-      destruct (Map.E.eq_dec s' s'); subst; try congruence.
-    + rewrite MapFacts.add_o in Find'.
-      destruct (Map.E.eq_dec s s'); subst; try congruence.
-      rewrite Find'.
-      auto.
+  repeat solver; try congruence.
 Qed.
-
-(*
-Definition upd_frame_rich {A} (m:mem A) (b:block) (fr:frame A)
-  : option { m' : (mem A S) |
-             (forall b',
-                get_frame m' b' = if b0 == b' then Some fr else get_frame m b')
-           /\ forall s, next m s = next m' s} :=
-    match m b0 with
-      | None => None
-      | Some _ =>
-        Some (MEM
-                (fun b => if b0 == b then Some fr else m b)
-                (next m) _ _)
-    end.
-  Next Obligation.
-    split.
-    - have [e|ne] := altP (b0 =P _).
-      + destruct b0; inv e. eexists. reflexivity.
-      + apply content_next; auto.
-    - have [e|ne] := altP (b0 =P _).
-      + case=> [? [?]]; inv e.
-        destruct (content_next m s i) as [_ H]. apply H.
-        eexists. symmetry. exact Heq_anonymous.
-      + destruct (content_next m s i) as [_ H]. apply H.
-  Qed.
-  Next Obligation.
-    destruct m. auto.
-  Qed.
-
-  Definition upd_frame {A} {S : eqType} (m:t A S) (b0:block S) (fr:@frame A S)
-  : option (t A S) :=
-    match upd_frame_rich m b0 fr with
-      | None => None
-      | Some (exist m' _) => Some m'
-    end.
-*)
 
 Lemma upd_frame_defined : forall A (m m':mem A) (b:block) fr,
     upd_frame m b fr = Some m' ->
     exists fr', get_frame m b = Some fr'.
 Proof.
-  rewrite /upd_frame /get_frame.
-  move => A m m' [i s] fr Upd.
-  destruct (Map.find s m) eqn:Find; [|congruence].
-  destruct (update_list_Z l i fr) as [l'|] eqn:Upd'; [|congruence].
-  inv Upd.
-  apply update_list_Z_spec3 in Upd'.
-  move: Upd' => [fr' Hfr'].
-  exists fr'.
-  simpl in *; auto.
-  rewrite Find.
-  auto.
+  rewrite /upd_frame /get_frame => A m m' [i s] fr Upd.
+  repeat solver; try congruence.
 Qed.
 
-  Opaque Z.add.
+Opaque Z.add.
 
-  Program Definition alloc
-             {A} {S : eqType} (am:alloc_mode) (m:t A S) (s:S) (fr:@frame A S)
-            : (block S * t A S) :=
-    ((next m s,s),
-     MEM
-       (fun b' => if (next m s,s) == b' then Some fr else get_frame m b')
-       (fun s' => if s == s' then (1 + next m s)%Z else next m s')
-       _ _).
-  Next Obligation.
-    have [e|ne] := (next m s, s) =P _.
-    - inv e; rewrite eqxx; split.
-      + intros Hrng. eexists. reflexivity.
-      + intros [fr' Heq]. inv Heq. split.
-        apply next_pos. omega.
-    - have [e|ne'] := s =P s0.
-      + inv e. split.
-        * intros [Hrng1 Hrng2]. destruct (content_next m s0 i) as [H _].
-          apply H. split; first assumption.
-          apply Zlt_is_le_bool in Hrng2.
-          rewrite -> Z.add_comm, <- Z.add_sub_assoc, Z.add_0_r in Hrng2.
-          apply Zle_bool_imp_le in Hrng2. apply Zle_lt_or_eq in Hrng2.
-          destruct Hrng2 as [Hrng2 | Hrng2]. assumption.
-          subst. exfalso. apply ne. reflexivity.
-        * intros [fr' Heq]. destruct (content_next m s0 i) as [_ H].
-          unfold get_frame in Heq.
-          assert (ex: (exists fr0 : frame, m (i, s0) = Some fr0))
-            by (eexists; eassumption).
-          destruct (H ex) as [H1 H2]. split; omega.
-      + split; intro Hrng; destruct (content_next m s0 i) as [H1 H2]; auto.
-  Qed.
-  Next Obligation.
-    have [e|ne] := s =P s0; destruct m; simpl.
-    - specialize (next_pos0 s); try omega.
-    - specialize (next_pos0 s0); assumption.
-  Qed.
+Definition alloc {A} (m:mem A) (s:Label) (fr:frame A)
+  : (block * mem A) :=
+  match Map.find s m with
+  | Some l =>
+    let i := Z.of_nat (length l) in
+    ((i, s), Map.add s (l ++ [:: fr]) m)
+  | None =>
+    ((Z0, s), Map.add s [:: fr] m)
+  end.
 
-  Lemma alloc_stamp : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') -> stamp b = s.
-  Proof.
-    unfold alloc; intros.
-    inv H; auto.
-  Qed.
+Lemma alloc_stamp : forall A (m m':mem A) s fr b,
+    alloc m s fr = (b,m') -> stamp b = s.
+Proof.
+  rewrite /alloc => A m m' s fr b HAlloc.
+  repeat solver.
+Qed.
 
-  Lemma alloc_get_fresh : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') -> get_frame m b = None.
-  Proof.
-    unfold alloc; intros.
-    inv H.
-    destruct (content_next m s (next m s)) as [_ H].
-    unfold get_frame.
-    destruct (m (next m s, s)).
-    - assert (ex: exists fr0 : frame, Some f = Some fr0)
-        by (eexists; reflexivity).
-      specialize (H ex). omega.
-    - reflexivity.
-  Qed.
+Lemma alloc_get_fresh : forall A (m m':mem A) s fr b,
+    alloc m s fr = (b,m') -> get_frame m b = None.
+Proof.
+  rewrite /alloc /get_frame => A m m' s' fr [i s] HAlloc //=.
+  repeat solver.
+Qed.
 
-  Lemma alloc_get_frame : forall A (S : eqType) am (m m':t A S) s fr b,
-    alloc am m s fr = (b,m') ->
+Lemma alloc_get_frame : forall A (m m':mem A) s0 fr b,
+    alloc m s0 fr = (b,m') ->
     forall b', get_frame m' b' = if b == b' then Some fr else get_frame m b'.
-  Proof.
-    unfold alloc; intros.
-    inv H; auto.
-  Qed.
+Proof.
+  rewrite /alloc /get_frame => A m m' s0 fr [i s] HAlloc [i' s'] //=.
+  repeat solver; try congruence.
+  - apply nth_error_Z_app; auto.
+  - move: (nth_error_Z_snoc l1 fr i') => [Contra | ?]; auto.
+    rewrite -Contra in NEq.
+    exfalso; eauto.
+  - destruct i'; auto;
+      try solve [exfalso; eauto].
+    { (* Should be moved *)
+          rewrite /nth_error_Z.
+          destruct (Z.pos p <? 0)%Z; auto.
+          destruct (Z.to_nat (Z.pos p)) eqn:Contra; simpl; auto.
+          - rewrite Z2Nat.inj_pos in Contra.
+            pose proof (Pos2Nat.is_pos p).
+            omega.
+          - destruct n; auto.
+    }
+Qed.
 
-  Lemma alloc_upd : forall A (S : eqType) am (m:t A S) b fr1 s fr2 m',
+Lemma alloc_upd : forall A (m:mem A) b fr1 s fr2 m',
     upd_frame m b fr1 = Some m' ->
-    fst (alloc am m' s fr2) = fst (alloc am m s fr2).
-  Proof.
-    intros A S am m b fr1 s fr2 m' H.
-    unfold alloc, upd_frame in *; simpl.
-    destruct (upd_frame_rich m b fr1); try congruence.
-    destruct s0; inv H.
-    destruct a as [_ T].
-    rewrite T; auto.
-  Qed.
+    fst (alloc m' s fr2) = fst (alloc m s fr2).
+Proof.
+  rewrite /alloc /upd_frame => A m [i s] fr1 s' fr2 m' H.
+  repeat solver; try congruence.
+  erewrite update_preserves_length_Z; eauto.
+Qed.
 
-  Lemma alloc_local :
-    forall A (S : eqType) (m1 m2:t A S) s fr1 fr2,
+Lemma alloc_local :
+    forall A (m1 m2:mem A) s fr1 fr2,
       (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
-      (alloc Local m1 s fr1).1 = (alloc Local m2 s fr2).1.
+      (alloc m1 s fr1).1 = (alloc m2 s fr2).1.
   Proof.
-    move=> A S [c1 n1 cn1 np1] [c2 n2 cn2 np2] s fr1 fr2.
+    rewrite /get_frame /alloc => A m1 m2 s fr1 fr2 H.
+    repeat solver; simpl.
+                                   [c1 n1 cn1 np1] [c2 n2 cn2 np2] s fr1 fr2.
     rewrite /get_frame /alloc /= => Pc12; congr pair.
     suff: forall i, (1 <= i < n1 s)%Z <-> (1 <= i < n2 s)%Z.
       move: (n1 s) (n2 s) (np1 s) (np2 s)=> {np1 np2} s1 s2 np1 np2 H.
