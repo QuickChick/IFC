@@ -27,9 +27,9 @@ QuickCheck (prop_fstep_preserves_well_formed default_table).
 
 (* Testing non-interference second (default table) *)
 
-Definition testSSNI t := quickCheck (propSSNI t).
+Definition testSSNI t := quickCheck (propSSNI_smart exp_result_normal t).
 
-QuickCheck (propSSNI default_table).
+QuickCheck (propSSNI_smart exp_result_normal default_table).
 
 (* Testing mutants third *)
 
@@ -41,15 +41,15 @@ Instance mutateable_table : Mutateable table :=
   mutate := mutate_table
 |}.
 
-Definition testMutantX_ p n : :=
-  p (nth n (mutate_table default_table) default_table).
+Definition testMutantX_  n :Checker :=
+  propSSNI_smart  exp_result_normal (nth n (mutate_table default_table) default_table).
 
 QuickChick (testMutantX_ 0).
-FuzzChick (testMutantX_ 0).
+(* FuzzChick (testMutantX_ 0).*)
 (*
 Eval simpl in (nth 24 (mutate_table default_table) default_table).
 *)
-MutateCheckMany default_table (fun t => [propSSNI t;
+MutateCheckMany default_table (fun t => [propSSNI_smart exp_result_normal t;
     prop_fstep_preserves_well_formed t]).
 
 (* The rest of this file is mostly garbage *)

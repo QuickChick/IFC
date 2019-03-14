@@ -2,10 +2,13 @@ Require Import ZArith.
 
 From QuickChick Require Import QuickChick.
 
+
 Require Import TestingCommon Indist Generation.
 Require Import GenerationProofsHelpers.
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
+
+
 
 (* The old version of the semantics for sequence is preferrable for these proofs *)
 Lemma Forall2_combine : forall {A} n (gs : list (G A)) l,
@@ -123,13 +126,13 @@ Qed.
 
 Section WithDataLenNonEmpty.
 
-Canonical lab4_eqType := (@LabelEqType.label_eqType Label _).
-
 Variable inf : Info.
 Hypothesis data_len_nonempty : data_len inf <> [::].
 Hypothesis code_len_correct  : RandomQC.leq Z0 ((code_len inf) - 1)%Z.
 Hypothesis data_len_positive : forall mf z, (mf,z) \in (data_len inf) ->
                                             RandomQC.leq Z0 (z-1)%Z.
+
+
 Hypothesis no_regs_positive : RandomQC.leq Z0 ((Z.of_nat (no_regs inf)) - 1)%Z.
 Hypothesis frame_sizes_correct : RandomQC.leq C.min_frame_size C.max_frame_size.
 (* PC *)
@@ -447,9 +450,9 @@ Qed.
 (* frame *)
 
 Definition mem_single_upd_spec mem mf (mem' : memory) :=
-  match Mem.get_frame mem mf with
+  match get_frame mem mf with
     | Some (Fr lab data) =>
-      exists fr, Mem.upd_frame mem mf fr = Some mem' /\
+      exists fr, upd_frame mem mf fr = Some mem' /\
                  let 'Fr lab' data' := fr in
                  lab' = lab /\
                  length data' = length data /\
@@ -462,8 +465,8 @@ Lemma populate_frame_correct :
     semGenSize (populate_frame inf mem mf) size <--> (mem_single_upd_spec mem mf).
 Proof.
   move=> mem mf mem'.  rewrite /populate_frame /mem_single_upd_spec.
-  case Heq: (Mem.get_frame mem mf)=> [[lab data]|] //=.
-  - move/Mem.upd_get_frame : (Heq) => Hupd.
+  case Heq: (get_frame mem mf)=> [[lab data]|] //=.
+  - move/upd_get_frame : (Heq) => Hupd.
     split.
     + move /semBindSize => [atmlst [/semVectorOfSize [Hl Hvec] HMatch]].
       move/(_ (Fr lab atmlst)): Hupd => [fr Hfr].
@@ -524,6 +527,7 @@ Proof.
     by apply: IH=> a' Pa'; apply: HIn; rewrite inE Pa' orbT.
 Qed.
 
+(*
 Definition init_mem_spec (size : nat) (m : memory)
            (blocks : list (mframe * Z)) (m': memory)
   (blocks': list (mframe * Z)) :=
@@ -538,15 +542,15 @@ Definition init_mem_spec (size : nat) (m : memory)
       (fun (ml : memory * (list (mframe * Z))) (elem : Label * (list Atom))  =>
          let '(l, data) := elem in
          let '(m_i, bs) := ml in
-         let (b, m) := Mem.alloc Local m_i bot (Fr l data) in
+         let (b, m) := Memory.alloc m_i bot (Fr l data) in
          (m, (b, Z.of_nat (length data)) :: bs)
       ) (m, blocks) lst.
 
 Definition mem_constraints (m : memory) :=
   forall b l data,
-    Mem.get_frame m b = Some (Fr l data) ->
+    get_frame m b = Some (Fr l data) ->
     (C.min_frame_size <= Z.of_nat (length data) <= C.max_frame_size)%Z /\
-    Mem.stamp b = bot.
+    Memory.stamp b = bot.
 
 (* (* CH: now unused *) *)
 (* Lemma all_bellow_top : forall l, *)
@@ -576,20 +580,20 @@ Proof.
         unfold alloc in Hgen.
         destruct (zreplicate_spec (Vint 0 @ ⊥) len) as [data [HIn [Heq HSome]]].
         simpl in *; omega. rewrite HSome in Hgen.
-        remember (Mem.alloc Local mem ⊥ (Fr lab data)) as alloc.
+        remember (Memory.alloc mem ⊥ (Fr lab data)) as alloc.
         destruct alloc as [fr mem'].
         destruct (IHn ((fr, Z.of_nat (length data)) :: blocks) mem')
           as [lst [Hlen [Hforall Hfold]]] => //; clear IHn.
         + rewrite /init_mem_spec in Hspec *.
           symmetry in Heqalloc. move : (Heqalloc) => Halloc.
           move => fr' lab' data' Hget.
-          apply Mem.alloc_get_frame with (b' := fr') in Halloc.
+          apply Memory.alloc_get_frame with (b' := fr') in Halloc.
           move: Halloc; rewrite Hget.
           have [efr|nefr] := altP (fr =P fr').
           * move=> [??]; subst lab' data' fr'.
             rewrite /C.min_frame_size /C.max_frame_size Heq.
             repeat split => //=; try (simpl in *; rewrite Z2Nat.id; omega).
-            by eapply Mem.alloc_stamp; apply Heqalloc.
+            by eapply Memory.alloc_stamp; apply Heqalloc.
           * move=> Halloc. eapply Hspec. rewrite -Halloc. eauto.
         + rewrite Heq. simpl in *; rewrite Z2Nat.id; last omega.
           by move: Hgen; rewrite -Heqalloc.
@@ -1835,7 +1839,7 @@ Abort.
   (*   rewrite returnGen_def in H1. *)
   (*   move : H1 => [Heq1 Heq2 Heq3]; subst. *)
   (*   rewrite /smart_gen in sgen, sgen2, sgen3, sgen4, sgen5, sgen6, sgen7 . *)
-
+*)
 End WithDataLenNonEmpty.
 
 End Sized.

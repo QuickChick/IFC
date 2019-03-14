@@ -70,7 +70,7 @@ Function reachable_from_root_set (obs : Label) (st : State)
       if h \in visited then
         reachable_from_root_set obs st visited t
       else
-        match Mem.get_frame (st_mem st) h with
+        match get_frame (st_mem st) h with
           | Some (Fr l atoms) =>
             let newCands :=
                 if isLow l obs then
@@ -90,13 +90,13 @@ Definition reachable (obs : Label) (st : State) : list mframe :=
 
 Definition well_formed_label (st : State) (l : Label) : bool :=
   let observable := reachable l st in
-  all (fun mf => let s := Mem.stamp mf in isLow s l) observable.
+  all (fun mf => let s := Memory.stamp mf in isLow s l) observable.
 
 (* Given a state and a stamp configuration, make sure everything is ok *)
 (* LL: This also suggests a way of generating stamps! Namely, get
    the meet of all the labels where a frame is reachable *)
 Definition well_formed (st : State) : bool :=
-  all (well_formed_label st) elems.
+  all (well_formed_label st) all_labels.
 
 (* Computes the meet of a list of labels. Must be provided with top as the
    initial accumulator *)

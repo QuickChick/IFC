@@ -1272,3 +1272,66 @@ Proof.
   - left; rewrite -Eq. symmetry. apply Z2Nat.id. apply Z.ltb_ge. auto.
   - right; auto.
 Qed.
+
+Lemma nth_error_length_ext :
+  forall {T} (l1 l2 : seq T),
+    (forall i, nth_error l1 i = nth_error l2 i :> bool) -> length l1 = length l2.
+Proof.
+  move => T l1; induction l1 => l2 Eq; destruct l2; auto.
+  - specialize (Eq 0); simpl in *; congruence.
+  - specialize (Eq 0); simpl in *; congruence.
+  - move: (Eq 0) => Eq'; inv Eq'; simpl; f_equal.
+    apply IHl1 => i.
+    specialize (Eq i.+1).
+      simpl in *.
+      auto.
+Qed.    
+
+Lemma nth_error_Z_length_ext :
+  forall {T} (l1 l2 : seq T),
+    (forall i, nth_error_Z l1 i = nth_error_Z l2 i :> bool) -> length l1 = length l2.
+Proof.
+  rewrite /nth_error_Z => T l1 l2 Eq.
+  apply nth_error_length_ext => i.
+  specialize (Eq (Z.of_nat i)).
+  destruct (Z.of_nat i <? 0)%Z eqn:H; simpl in *; auto.
+  - apply Z.ltb_lt in H.
+    pose proof (Zle_0_nat i).
+    omega.
+  - rewrite !Nat2Z.id in Eq.
+    auto.
+Qed.
+
+
+Lemma nth_error_extensionality :
+  forall {T} (l1 l2 : seq T),
+    (forall i, nth_error l1 i = nth_error l2 i) -> l1 = l2.
+Proof.
+  move => T l1; induction l1 => l2 Eq.
+  - destruct l2; auto.
+    specialize (Eq 0).
+    simpl in *.
+    congruence.
+  - destruct l2.
+    + specialize (Eq 0); simpl in *; congruence.
+    + move: (Eq 0) => Eq'; inv Eq'; f_equal.
+      apply IHl1 => i.
+      specialize (Eq i.+1).
+      simpl in *.
+      auto.
+Qed.
+
+Lemma nth_error_Z_extensionality :
+  forall {T} (l1 l2 : seq T),
+    (forall i, nth_error_Z l1 i = nth_error_Z l2 i) -> l1 = l2.
+Proof.
+  rewrite /nth_error_Z => T l1 l2 Eq.
+  apply nth_error_extensionality => i.
+  specialize (Eq (Z.of_nat i)).
+  destruct (Z.of_nat i <? 0)%Z eqn:H; simpl in *; auto.
+  - apply Z.ltb_lt in H.
+    pose proof (Zle_0_nat i).
+    omega.
+  - rewrite !Nat2Z.id in Eq.
+    auto.
+Qed.

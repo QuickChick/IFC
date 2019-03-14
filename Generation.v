@@ -58,7 +58,7 @@ Definition gen_BinOpT : G BinOpT :=
 (* Labels *)
 
 Definition gen_label : G Label :=
-  elems_ bot elems.
+  elems_ bot all_labels.
 
 Definition gen_label_between_lax (l1 l2 : Label) : G Label :=
   elems_ l2 (filter (fun l => isLow l1 l) (allThingsBelow l2)).
@@ -375,10 +375,10 @@ Instance smart_vary_frame : SmartVary frame :=
    corresponding frame *)
 Definition handle_single_mframe obs inf (m : memory) (mf : mframe)
 : G memory :=
-  match Mem.get_frame m mf with
+  match get_frame m mf with
     | Some f =>
       bindGen (smart_vary obs inf f) (fun f' =>
-      match Mem.upd_frame m mf f' with
+      match upd_frame m mf f' with
         | Some m' => returnGen m'
         | None    => returnGen m
       end)
@@ -387,7 +387,7 @@ Definition handle_single_mframe obs inf (m : memory) (mf : mframe)
 
 Definition gen_vary_memory  obs inf (m : memory)
 : G memory :=
-  let all_mframes := Mem.get_blocks elems m in
+  let all_mframes := get_blocks all_labels m in
   foldGen (handle_single_mframe obs inf) all_mframes m.
 
 (* Vary memory *)
@@ -537,17 +537,17 @@ Fixpoint gen_init_mem_helper (n : nat) (ml : memory * list (mframe * Z)) :=
 Definition gen_init_mem : G (memory * list (mframe * Z)):=
   bindGen (choose (C.min_no_frames,
                       C.max_no_frames)) (fun no_frames =>
-  gen_init_mem_helper no_frames (Mem.empty Atom Label, [::])).
+  gen_init_mem_helper no_frames (Memory.empty Atom, [::])).
 
 Definition failed_state : State :=
   (* Property.trace "Failed State!" *)
-                 (St [::] (Mem.empty Atom Label) (ST [::]) [::] (PAtm Z0 bot)).
+                 (St [::] (Memory.empty Atom) (ST [::]) [::] (PAtm Z0 bot)).
 
 Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
-  match Mem.get_frame m mf with
+  match get_frame m mf with
     | Some (Fr lab data) =>
       bindGen (vectorOf (length data) (smart_gen inf)) (fun data' =>
-      match Mem.upd_frame m mf (Fr lab data') with
+      match upd_frame m mf (Fr lab data') with
         | Some m' => returnGen m'
         | _ => pure m
       end)
@@ -567,11 +567,11 @@ Definition get_blocks_and_sizes (m : memory) :=
   map
     (fun b =>
     let length :=
-        match Mem.get_frame m b with
+        match get_frame m b with
           | Some fr =>
             let 'Fr _ data := fr in length data
           | _ => 0
-        end in (b, Z.of_nat length)) (Mem.get_blocks elems m).
+        end in (b, Z.of_nat length)) (get_blocks all_labels m).
 
 (* Generate an initial state.
    TODO : Currently stamps are trivially well formed (all bottom) *)
@@ -621,7 +621,7 @@ Instance shrBinOpT : Shrink BinOpT :=
 
 
 (* Arbitrary version *)
-  Derive GenSized for Lab4.
+  Derive GenSized for Label.
 
   Derive GenSized for Instr.
 
@@ -645,13 +645,13 @@ Fixpoint arb_init_mem_helper (n : nat) (ml : memory * list (mframe * Z)) :=
 
 Definition arb_init_mem : G (memory * list (mframe * Z)):=
   bindGen arbitrary (fun no_frames =>
-  arb_init_mem_helper no_frames (Mem.empty Atom Label, nil)).
+  arb_init_mem_helper no_frames (Memory.empty Atom, nil)).
 
 Definition arb_frame (m : memory) (mf : mframe) : G memory :=
-  match Mem.get_frame m mf with
+  match get_frame m mf with
     | Some (Fr lab data) =>
       bindGen (vectorOf (List.length data) (arbitrary)) (fun data' =>
-      match Mem.upd_frame m mf (Fr lab data') with
+      match upd_frame m mf (Fr lab data') with
         | Some m' => returnGen m'
         | _ => pure m
       end)

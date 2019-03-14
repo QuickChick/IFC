@@ -129,15 +129,13 @@ Admitted.
 
 Definition Z_seq z1 z2 := map Z.of_nat (iota (Z.to_nat z1) (Z.to_nat z2)).
 
-  (*
-  Definition get_blocks_at_level {A} (m : t A) (s : S) :=
+Definition get_blocks_at_level {A} (m : mem A) s:=
     let max := next m s in
-    let indices := Z_seq 1%Z (max - 1) in
+    let indices := Z_seq 0%Z max in
     map (fun ind => (ind,s)) indices.
 
-  Definition get_blocks {A S} (ss : list S) (m : t A S) : seq (block S) :=
+Definition get_blocks {A} (ss : list Label) (m : mem A) : list block :=
     flatten (map (get_blocks_at_level m) ss).
-   *)
 
 Instance show_block : Show block :=
   {|
@@ -394,37 +392,39 @@ Lemma alloc_local :
     forall A (m1 m2:mem A) s fr1 fr2,
       (forall b, stamp b = s -> get_frame m1 b = get_frame m2 b :> bool) ->
       (alloc m1 s fr1).1 = (alloc m2 s fr2).1.
-  Proof.
-    rewrite /get_frame /alloc => A m1 m2 s fr1 fr2 H.
-    repeat solver; simpl.
-                                   [c1 n1 cn1 np1] [c2 n2 cn2 np2] s fr1 fr2.
-    rewrite /get_frame /alloc /= => Pc12; congr pair.
-    suff: forall i, (1 <= i < n1 s)%Z <-> (1 <= i < n2 s)%Z.
-      move: (n1 s) (n2 s) (np1 s) (np2 s)=> {np1 np2} s1 s2 np1 np2 H.
-      have: forall s1 s2, (1 <= s1)%Z -> (1 <= s2)%Z ->
-                          (forall i, (1 <= i < s1)%Z -> (1 <= i < s2)%Z) ->
-                          (s1 <= s2)%Z.
-        move=> {s1 s2 np1 np2 H} s1 s2 np1 np2 H.
-        have [?|p]: (s1 = 1)%Z \/ (1 < s1)%Z by omega.
-          by subst s1.
-        suff: (s1 - 1 < s2)%Z by move=> ?; omega.
-        move: (H (s1 - 1)%Z) => ?; omega.
-      move=> H'.
-      move: (H' _ _ np1 np2 (fun i => (H i).1)) => H1.
-      move: (H' _ _ np2 np1 (fun i => (H i).2)) => H2.
-      omega.
-    move=> i; rewrite -> cn1, -> cn2.
-    move: (Pc12 (i, s) erefl).
-    case: (c1 _) => [fr1'|]; case: (c2 _) => [fr2'|] //= _; intuition eauto.
-  Qed.
+Proof.
+  rewrite /get_frame /alloc => A m1 m2 s fr1 fr2 H.
+  repeat solver; simpl.
+  - f_equal. f_equal.
+    apply nth_error_Z_length_ext => i.
+    specialize (H (i,s)).
+      simpl in *.
+      rewrite Case in H.
+      rewrite Case0 in H.
+      apply H; auto.
+  - specialize (H (0%Z,s)).
+    simpl in *.
+    rewrite Case Case0 in H.
+    destruct l; simpl in *; simpl in *; auto.
+    compute in H.
+    specialize (H Coq.Init.Logic.eq_refl).
+    congruence.
+  - specialize (H (0%Z,s)).
+    simpl in *.
+    rewrite Case Case0 in H.
+    destruct l; simpl in *; simpl in *; auto.
+    compute in H.
+    specialize (H Coq.Init.Logic.eq_refl).
+    congruence.
+Qed.
 
-  Lemma in_seq_Z:
-    forall z start len,
-      (0 <= start)%Z ->
+Lemma in_seq_Z:
+  forall z start len,
+    (0 <= start)%Z ->
       (0 <= len)%Z ->
       ((start <= z < len + start)%Z <->
        z \in (Z_seq start len)).
-  Proof.
+Proof.
     intros z s l. intros Hle1 Hle2. split.
     - intros [H1 H2]. unfold Z_seq.
       apply/mapP. exists (Z.to_nat z); last by rewrite Z2Nat.id; omega.
@@ -469,81 +469,83 @@ Lemma alloc_local :
           move=> /andP [/leP H1 /ltP H2].
           apply/andP; split; [apply/leP| apply/ltP]; try omega. }
         apply H'. apply IHlen; try omega. assumption.
-  Qed.
+Qed.
 
-  Lemma get_blocks_spec :
-    forall A (S : eqType) (labs : seq S) (mem: t A S) b,
+Lemma get_blocks_spec :
+    forall A (labs : list Label) (mem: mem A) b,
       (stamp b \in labs) && get_frame mem b <->
       b \in get_blocks labs mem.
-  Proof.
-    intros A S labs mem b.
-    split.
+Proof.
+  intros A labs mem b; split.
     - case/andP => HIn.
       case Hget: get_frame => [fr|] //= _.
       unfold get_blocks; apply/flatten_mapP.
       eexists; [eassumption|].
       unfold get_blocks_at_level. apply/mapP. exists b.1;
       destruct b=> //.
-      apply in_seq_Z; try omega.
-      * apply Zle_minus_le_0. apply next_pos.
-      * rewrite <- Z.sub_sub_distr, Z.sub_0_r. simpl.
-        apply content_next. eexists. eassumption.
+      apply in_seq_Z; try omega; simpl in *.
+      * apply next_pos.
+      * rewrite Z.add_0_r.
+        apply get_frame_next. eexists. eassumption.
     - intros HIn. unfold get_blocks, get_blocks_at_level in *.
       move/flatten_mapP in HIn. destruct HIn as [l HInl HIn].
       move/mapP in HIn. destruct HIn as [z HIn Heq]. subst.
       rewrite HInl /=.
       unfold get_frame.
-      suff [fr ->] : exists fr, mem (z, l) = Some fr by [].
-      apply content_next. apply in_seq_Z in HIn; try omega.
-      apply Zle_minus_le_0. apply next_pos.
-  Qed.
-
-End Mem.
-
-Canonical Mem.block_eqType.
+      simpl in *.
+      apply in_seq_Z in HIn; try omega.
+      * rewrite Z.add_0_r in HIn. apply get_frame_next in HIn.
+        move: HIn => [fr H].
+        rewrite /get_frame in H.
+        simpl in *.
+        destruct (Map.find l mem).
+        + rewrite H; auto.
+        + congruence.
+      * apply next_pos.
+Qed.
 
 Lemma alloc_get_frame_old :
-  forall T (S : eqType) mode mem (stamp : S) (f f' : @frame T S) b b' mem'
-         (ALLOC : Mem.alloc mode mem stamp f' = (b', mem'))
-         (FRAME : Mem.get_frame mem b = Some f),
-    Mem.get_frame mem' b = Some f.
+  forall T mem (stamp : Label) (f f' : frame T) b b' mem'
+         (ALLOC : alloc mem stamp f' = (b', mem'))
+         (FRAME : get_frame mem b = Some f),
+    get_frame mem' b = Some f.
 Proof.
   intros.
-  erewrite Mem.alloc_get_frame; eauto.
+  erewrite alloc_get_frame; eauto.
   have [e|//] := altP (b' =P b).
-  exploit Mem.alloc_get_fresh; eauto.
+  exploit alloc_get_fresh; eauto.
   congruence.
 Qed.
 
 Lemma alloc_get_frame_new :
-  forall T (S : eqType) mode mem (stamp : S) (frame : @frame T S) b mem'
-         (ALLOC : Mem.alloc mode mem stamp frame = (b, mem')),
-    Mem.get_frame mem' b = Some frame.
+  forall T mem (stamp : Label) (frame : frame T) b mem'
+         (ALLOC : alloc mem stamp frame = (b, mem')),
+    get_frame mem' b = Some frame.
 Proof.
   intros.
-  erewrite Mem.alloc_get_frame; eauto.
+  erewrite alloc_get_frame; eauto.
   by rewrite eqxx; simpl in *; auto.
 Qed.
 
 Lemma get_frame_upd_frame_eq :
-  forall T (S : eqType)
-         (m : Mem.t T S) b f m'
-         (UPD : Mem.upd_frame m b f = Some m'),
-    Mem.get_frame m' b = Some f.
+  forall T 
+         (m : mem T) b f m'
+         (UPD : upd_frame m b f = Some m'),
+    get_frame m' b = Some f.
 Proof.
   intros.
-  erewrite Mem.get_upd_frame; eauto.
+  erewrite get_upd_frame; eauto.
   by rewrite eqxx.
 Qed.
 
 Lemma get_frame_upd_frame_neq :
-  forall T (S : eqType)
-         (m : Mem.t T S) b b' f m'
-         (UPD : Mem.upd_frame m b f = Some m')
+  forall T 
+         (m : mem T) b b' f m'
+         (UPD : upd_frame m b f = Some m')
          (NEQ : b' <> b),
-    Mem.get_frame m' b' = Mem.get_frame m b'.
+    get_frame m' b' = get_frame m b'.
 Proof.
   intros.
-  erewrite Mem.get_upd_frame; eauto.
+  erewrite get_upd_frame; eauto.
   have [?|?] := (b =P b'); simpl in *; congruence.
 Qed.

@@ -158,7 +158,7 @@ Qed.
 
 Lemma in_map_zip :
   forall {A B C} (l1 : list A) (l2 : list B) x y (f : B -> C),
-     In (x, y) (seq.zip l1 l2) -> In (x, f y) (seq.zip l1 (map f l2)).
+     In (x, y) (seq.zip l1 l2) -> In (x, f y) (seq.zip l1 (List.map f l2)).
 Proof.
   move=> A B C.
   elim => [| x xs IHxs]; case => // y ys x' y' f [[Heq1 Heq2] | HIn]; subst.
@@ -172,7 +172,7 @@ Qed.
 
 Lemma in_map_zip_iff :
   forall {A B C} (l1 : list A) (l2 : list B) x y (f : B -> C),
-    In (x, y) (seq.zip l1 (map f l2)) <->
+    In (x, y) (seq.zip l1 (List.map f l2)) <->
      exists z, f z = y /\ In (x, z) (seq.zip l1 l2).
 Proof.
   move=> A B C. split.

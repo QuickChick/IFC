@@ -8,22 +8,8 @@ Require Export Utils.
 Require Export Labels.
 Require Export Instructions.
 Require Export Memory.
-Require Export Lab4.
 Require Export Indist.
 Require Export Machine.
-
-Module Lab4M <: FINLAT.
-  Definition Label := Lab4.
-  Definition FLat  := FiniteLattice_Lab4.
-End Lab4M.
-
-Module MachineLab4M := MachineM Lab4M.
-Export MachineLab4M.
-
-Module IndistLab4M := IndistM Lab4M.
-Export IndistLab4M.
-
-
 
 Definition pure {A : Type} (x : A) : G A := returnGen x.
 
@@ -38,7 +24,7 @@ Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
 
 (* Variation stuff - should be deleted -- CH: ha? it seems used *)
 Inductive Variation {A : Type} :=
-| Var : Lab4 -> A -> A -> Variation.
+| Var : Label -> A -> A -> Variation.
 
 Class ShrinkV (A : Type) := { shrinkV : @Variation A -> list (@Variation A) }.
 (* End of to be deleted *)

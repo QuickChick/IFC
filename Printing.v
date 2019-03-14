@@ -25,7 +25,7 @@ Instance showPos : Show positive :=
   show := show_pos
 |}.
 
-Instance show_label : Show Lab4 :=
+Instance show_label : Show Label :=
 {|
   show lab := match lab with
                 | L  => "L"
@@ -161,7 +161,7 @@ Definition show_variation (s1 s2 : string) :=
 
 Class ShowPair (A : Type) : Type :=
 {
-  show_pair : Lab4 -> A -> A -> string
+  show_pair : Label -> A -> A -> string
 }.
 
 Instance show_value_pair : ShowPair Value :=
@@ -171,7 +171,7 @@ Instance show_value_pair : ShowPair Value :=
     else show_variation (show v1) (show v2)
 |}.
 
-Instance show_label_pair : ShowPair Lab4 :=
+Instance show_label_pair : ShowPair Label :=
 {|
   show_pair lab l1 l2 :=
     if eqtype.eq_op l1 l2 then show l1
@@ -197,7 +197,7 @@ Instance show_ptr_atom_pair : ShowPair Ptr_atom :=
 |}.
 
 Fixpoint show_pair_list {A : Type} `{_ : Show A} `{_ : ShowPair A}
-         (n : nat) (lab : Lab4)
+         (n : nat) (lab : Label)
          (l1 l2 : list A) :=
   match n with
     | O => match l1, l2 with
@@ -228,7 +228,7 @@ Fixpoint show_mem_pair_helper (frame_pairs : list (mframe * mframe))
       (if f1 == f2 then show f1
       else show_variation (show f1) (show f2)) ++ (
       (* Show actual corresponding frames *)
-      match Mem.get_frame m1 f1, Mem.get_frame m2 f2 with
+      match get_frame m1 f1, get_frame m2 f2 with
         | Some (Fr l1 data1), Some (Fr l2 data2) =>
           (if eqtype.eq_op l1 l2 then
             "DFR @ " ++ show l1 ++ " : [ "
@@ -255,7 +255,7 @@ Definition show_high_frames m (mfs : list mframe) :=
       match mfs with
         | [::] => ""
         | h :: t =>
-          match Mem.get_frame m h with
+          match get_frame m h with
             | Some f => par (show h) ++ " : " ++ show f ++ nl ++ aux t
             | _ => "ERROR SHOWING EXTRA FRAMES"
           end
@@ -267,12 +267,12 @@ Definition show_high_frames m (mfs : list mframe) :=
 
 Definition show_pair_mem (obs : Label) (m1 m2 : memory)
 : string :=
-  let frames1 := Mem.get_blocks elems m1 in
-  let high1 := filter (fun mf => isHigh (Mem.stamp mf) obs) frames1 in
-  let low1  := filter (fun mf => isLow  (Mem.stamp mf) obs) frames1 in
-  let frames2 := Mem.get_blocks elems m2 in
-  let high2 := filter (fun mf => isHigh (Mem.stamp mf) obs) frames2 in
-  let low2  := filter (fun mf => isLow  (Mem.stamp mf) obs) frames2 in
+  let frames1 := get_blocks all_labels m1 in
+  let high1 := filter (fun mf => isHigh (Memory.stamp mf) obs) frames1 in
+  let low1  := filter (fun mf => isLow  (Memory.stamp mf) obs) frames1 in
+  let frames2 := get_blocks all_labels m2 in
+  let high2 := filter (fun mf => isHigh (Memory.stamp mf) obs) frames2 in
+  let low2  := filter (fun mf => isLow  (Memory.stamp mf) obs) frames2 in
   "DEBUG: " ++ nl ++
   "fst: " ++ show frames1 ++ nl ++
   "snd: " ++ show frames2 ++ nl ++
@@ -362,7 +362,7 @@ Instance show_variation_instance : Show Variation :=
             "Obs level:" ++ show lab ++ nl ++ show_pair lab st1 st2
 |}.
 
-Fixpoint show_execution (lab : Lab4)
+Fixpoint show_execution (lab : Label)
          (sts1 sts2 : list State) :=
   match sts1, sts2 with
     | h1::t1, h2::t2 =>

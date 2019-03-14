@@ -39,6 +39,15 @@ Definition exp_result_fuzz : exp_result :=
    ; exp_check   := (fun b => collect b b)
   |}.
 
+(* Normal *)
+Definition exp_result_normal : exp_result :=
+  {| exp_success := checker true
+   ; exp_fail    := checker false
+   ; exp_reject  := checker tt
+   ; exp_check   := (fun b => checker b)
+  |}.
+
+  
 Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Checker  :=
     let '(Var lab st1 st2) := v in
     if indist lab st1 st2 then
@@ -78,4 +87,4 @@ Definition propSSNI_helper (t : table) (v : Variation) (res : exp_result) : Chec
     forAllShrinkShow arbitrary (fun _ => nil) (fun _ => ""%string)
       (fun v => propSSNI_helper t v r).
 
-                     
+

@@ -1,14 +1,15 @@
 Require Import ZArith.
 
+From mathcomp Require Import ssreflect ssrbool eqtype seq.
+
 Require Import Utils. Import DoNotation. 
 Require Import Labels.
+Import LabelEqType.
+
 Require Import Rules.
 Require Import Memory.
 Require Import Instructions.
 
-From mathcomp Require Import ssreflect ssrbool eqtype seq.
-
-Import LabelEqType.
 
 (** Rule Table *)
 
@@ -62,20 +63,12 @@ Definition default_table : table := fun op =>
   | OpMov     =>  ≪ TRUE , Lab1 , LabPC ≫
 end.
 
-Module Type FINLAT.
-  Parameter Label : Type.
-  Parameter FLat  : FiniteLattice Label.
-End FINLAT.
-
-Module MachineM (Lab : FINLAT).
-Export Lab.
-
 (* Short for a label l to be low/high compared to an observability label obs *)
 Notation isLow l obs := (flows l obs).
 Notation isHigh l obs := (negb (isLow l obs)).
 
 (** memory frame pointers. *)
-Notation mframe := (Mem.block Label).
+Notation mframe := block.
 
 (* values *)
 Inductive Pointer : Type :=
@@ -85,10 +78,6 @@ Inductive Value : Type :=
   | Vint  (n:Z)
   | Vptr  (p:Pointer)
   | Vlab  (l:Label).
-
-Instance jsl_lab : JoinSemiLattice Label.
-  apply FLat.
-Defined.
 
 Definition val_eq (v1 v2 : Value) : bool :=
   match v1, v2 with
@@ -229,23 +218,23 @@ Definition eval_binop (b : BinOpT) (v1 v2 : Value) : option Value :=
     | _ ,       _ ,      _       => None
   end.
 
-Definition memory := Mem.t Atom Label.
+Definition memory := mem Atom.
 (* Specialize the Memory frame declaration *)
-Definition frame := @frame Atom Label.
+Definition frame := frame Atom.
 
 Canonical frame_eqType :=
-  Eval hnf in EqType frame (frame_eqMixin [eqType of Atom] [eqType of Label]).
+  Eval hnf in EqType frame (frame_eqMixin [eqType of Atom]). 
 
 Definition alloc (size:Z) (lab stamp:Label) (a:Atom) (m:memory)
 : option (mframe * memory) :=
   match zreplicate size a with
-    | Some fr => Some (Mem.alloc Local m stamp (Fr lab fr))
+    | Some fr => Some (alloc m stamp (Fr lab fr))
     | _ => None
   end.
 
 Definition load (m : memory) (p : Pointer) : option Atom :=
   let '(Ptr f addr) := p in
-  match Mem.get_frame m f with
+  match get_frame m f with
     | None => None
     | Some (Fr _ fr) => nth_error_Z fr addr
   end.
@@ -253,25 +242,25 @@ Definition load (m : memory) (p : Pointer) : option Atom :=
 Definition store (m : memory) (p : Pointer) (a:Atom)
 : option (memory) :=
   let '(Ptr f addr) := p in
-  match Mem.get_frame m f with
+  match get_frame m f with
     | None => None
     | Some (Fr lab data) =>
       match update_list_Z data addr a with
         | None => None
-        | Some data' => (Mem.upd_frame m f (Fr lab data'))
+        | Some data' => (upd_frame m f (Fr lab data'))
       end
   end.
 
 Definition msize (m:memory) (p:Pointer) : option nat :=
   let (fp,i) := p in
-  match Mem.get_frame m fp with
+  match get_frame m fp with
     | Some (Fr _ data) => Some (length data)
     | _ => None
   end.
 
 Definition mlab (m:memory) (p:Pointer) : option Label :=
   let (fp,i) := p in
-  match Mem.get_frame m fp with
+  match get_frame m fp with
     | Some (Fr l _) => Some l
     | _ => None
   end.
@@ -288,7 +277,7 @@ Lemma load_alloc : forall size stamp label a m m' mf,
 Proof.
   unfold alloc, load; intros.
   destruct (zreplicate size a) eqn:Ez; try congruence; inv H.
-  rewrite (Mem.alloc_get_frame H1).
+  rewrite (alloc_get_frame H1).
   case: (mf =P mf')=> ? //=; simpl in *.
   subst.
   simpl.
@@ -304,10 +293,10 @@ Lemma load_store : forall {m m'} {b ofs a},
       else load m (Ptr b' ofs').
 Proof.
   unfold store, load; intros.
-  destruct (Mem.get_frame m b) eqn:E1; try congruence.
+  destruct (get_frame m b) eqn:E1; try congruence.
   destruct f as [lab l].
   destruct (update_list_Z l ofs a) eqn:E2; try congruence.
-  rewrite (Mem.get_upd_frame H).
+  rewrite (get_upd_frame H).
   have [e|neb //] := (b =P b'); simpl in *.
   subst b'.
   have [?|?] := eqP.
@@ -342,52 +331,52 @@ Lemma load_some_store_some : forall {m:memory} {b ofs a},
       exists m', store m (Ptr b ofs) a' = Some m'.
 Proof.
   unfold load, store; intros.
-  destruct (Mem.get_frame m b) eqn:E; try congruence.
+  destruct (get_frame m b) eqn:E; try congruence.
   destruct f eqn:?. (* I don't like this *)
   exploit nth_error_Z_valid; eauto.
   destruct 1.
   destruct (@update_list_Z_Some _ a' l ofs); auto.
   rewrite H2.
-  eapply Mem.upd_get_frame; eauto.
+  eapply upd_get_frame; eauto.
 Qed.
 
 Lemma get_frame_store_neq :
   forall (m : memory ) b b' off a m'
          (STORE : store m (Ptr b off) a = Some m')
          (NEQ : b' <> b),
-    Mem.get_frame m' b' = Mem.get_frame m b'.
+    get_frame m' b' = get_frame m b'.
 Proof.
   unfold store.
   intros.
-  destruct (Mem.get_frame m b) as [f|] eqn:FRAME; try congruence.
+  destruct (get_frame m b) as [f|] eqn:FRAME; try congruence.
   destruct f as [lab l] eqn:?.
   destruct (update_list_Z l off a) as [l'|] eqn:NEWFRAME; try congruence.
   eapply get_frame_upd_frame_neq; eauto.
 Qed.
 
 Lemma alloc_get_frame_eq :
-  forall m s (mem : memory) f b mem',
-    Mem.alloc m mem s f = (b, mem') ->
-    Mem.get_frame mem' b = Some f.
+  forall s (mem : memory) f b mem',
+    Memory.alloc mem s f = (b, mem') ->
+    get_frame mem' b = Some f.
 Proof.
   intros.
-  erewrite Mem.alloc_get_frame; eauto.
+  erewrite alloc_get_frame; eauto.
   by rewrite eqxx.
 Qed.
 
 Lemma alloc_get_frame_neq :
-  forall m s (mem : memory) f b b' mem',
-    Mem.alloc m mem s f = (b, mem') ->
+  forall s (mem : memory) f b b' mem',
+    Memory.alloc mem s f = (b, mem') ->
     b <> b' ->
-    Mem.get_frame mem' b' = Mem.get_frame mem b'.
+    get_frame mem' b' = get_frame mem b'.
 Proof.
   intros.
-  erewrite Mem.alloc_get_frame; eauto.
+  erewrite alloc_get_frame; eauto.
   have [?|?] := (b =P b'); simpl in *; congruence.
 Qed.
 
 Definition extends (m1 m2 : memory) : Prop :=
-  forall b fr, Mem.get_frame m1 b = Some fr -> Mem.get_frame m2 b = Some fr.
+  forall b fr, get_frame m1 b = Some fr -> get_frame m2 b = Some fr.
 
 Lemma extends_refl : forall (m : memory), extends m m.
 Proof. unfold extends. auto. Qed.
@@ -403,7 +392,7 @@ Lemma extends_load (m1 m2 : memory) b off a :
 Proof.
   intros.
   unfold load in *.
-  destruct (Mem.get_frame m1 b) as [fr|] eqn:FRAME; inv DEF.
+  destruct (get_frame m1 b) as [fr|] eqn:FRAME; inv DEF.
   erewrite EXT; eauto.
 Qed.
 
@@ -900,4 +889,3 @@ Qed.
 Definition pc_eqMixin := EqMixin pc_eqP.
 Canonical pc_eqType := EqType _ pc_eqMixin.
 
-End MachineM.

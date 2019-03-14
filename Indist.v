@@ -4,16 +4,8 @@ Require Import Instructions.
 From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype.
 
 Require Import Utils Labels Memory Machine.
-(*Require Import Common.*)
-
-Module IndistM (Lattice : FINLAT).
-
-Module GenericMachine := MachineM Lattice.
 
 Import LabelEqType.
-
-(* CH: things fail in very strange ways if this is just Import *)
-Export GenericMachine.
 
 Open Scope bool.
 
@@ -119,13 +111,12 @@ Defined.
    - Get all pairs that have been allocated in low contexts.
 *)
 
-Existing Instance FLat.
 Definition blocks_stamped_below (lab : Label) (m : memory) : seq mframe :=
-  Mem.get_blocks (allThingsBelow lab) m.
+  get_blocks (allThingsBelow lab) m.
 
 Definition indistMemAsym lab m1 m2 :=
   all (fun b =>
-         indist lab (Mem.get_frame m1 b) (Mem.get_frame m2 b))
+         indist lab (get_frame m1 b) (get_frame m2 b))
       (blocks_stamped_below lab m1).
 
 Instance indistMem : Indist memory :=
@@ -141,14 +132,14 @@ Proof.
 Defined.
 
 Lemma indistMemP lab m1 m2 :
-  (forall b, isLow (Mem.stamp b) lab ->
-             Mem.get_frame m1 b || Mem.get_frame m2 b ->
-             indist lab (Mem.get_frame m1 b) (Mem.get_frame m2 b)) ->
+  (forall b, isLow (stamp b) lab ->
+             get_frame m1 b || get_frame m2 b ->
+             indist lab (get_frame m1 b) (get_frame m2 b)) ->
   indist lab m1 m2.
 Proof.
 move=> H; apply/andP; split; apply/allP=> b;
-rewrite /blocks_stamped_below -Mem.get_blocks_spec /allThingsBelow
-        mem_filter all_elems andbT => /andP [Pb get_b];
+rewrite /blocks_stamped_below -get_blocks_spec /allThingsBelow
+        mem_filter all_labels_correct andbT => /andP [Pb get_b];
 move: (H b Pb); rewrite get_b ?orbT => /(_ erefl)=> //.
 by rewrite indist_sym.
 Qed.
@@ -249,4 +240,3 @@ Proof.
           (indist_sym st1) (indist_sym rs1) (indist_sym (drop _ _)).
 Defined.
 
-End IndistM.

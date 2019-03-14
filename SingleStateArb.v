@@ -27,9 +27,9 @@ Instance gState : Gen State :=
 
 Instance shrState : Shrink State :=
 {| shrink x :=
-    let all := shrinkVState (Var top x x) in
+    let all : list (@Variation State):= shrinkVState (Var top x x) in
     let state_of_var v := let '(Var _ x _) := v in x in
-    filter (indist top x) (map state_of_var all)
+    filter (indist top x) (List.map state_of_var all)
 |}.
 
 Instance showState : Show State :=

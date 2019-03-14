@@ -5,7 +5,7 @@ Require Import NPeano.
 
 From QuickChick Require Import QuickChick.
 
-Require Import TestingCommon. Import Mem.
+Require Import TestingCommon. 
 Require Import Indist.
 Require Import Generation.
 
