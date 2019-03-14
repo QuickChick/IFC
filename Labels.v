@@ -11,6 +11,7 @@ Inductive Label : Set :=
   | M2 : Label
   | H  : Label.
 
+
 Definition bot := L.
 
 Definition join l1 l2 :=
@@ -208,3 +209,5 @@ Proof. by case. Defined.
 From QuickChick Require Import QuickChick.
 Derive Show for Label.
 Derive Arbitrary for Label.
+Derive Fuzzy for Label.
+

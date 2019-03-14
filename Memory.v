@@ -15,6 +15,10 @@ Unset Printing Implicit Defensive.
 (* I'm ending the craziness. Label model is now fixed to be Lab4. *)
 Inductive frame A := Fr (lab : Label) : seq A -> frame A.
 
+Derive Arbitrary for frame.
+Derive Fuzzy for frame.
+Derive Show for frame. 
+
 Section FrameEqType.
 
 Variables A : eqType.

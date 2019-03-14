@@ -1,4 +1,4 @@
-From QuickChick Require Import QuickChick.
+From QuickChick Require Import QuickChick FMapWeakListInstances. 
 
 Require Import TestingCommon.
 
@@ -621,57 +621,24 @@ Instance shrBinOpT : Shrink BinOpT :=
 
 
 (* Arbitrary version *)
-  Derive GenSized for Label.
 
   Derive GenSized for Instr.
-
   Derive GenSized for Pointer.
   Derive GenSized for Value.
   Derive GenSized for Atom.
+  Derive GenSized for Ptr_atom.
+  Derive GenSized for StackFrame.
+  Derive GenSized for Stack.
+  Derive GenSized for State.
+  Derive GenSized for Variation.
 
-Fixpoint arb_init_mem_helper (n : nat) (ml : memory * list (mframe * Z)) :=
-  match n with
-    | O    => returnGen ml
-    | S n' =>
-      let (m, l) := ml in
-      bindGen arbitrary (fun frame_size =>
-      bindGen arbitrary (fun lab =>
-         match (alloc frame_size lab bot (Vint Z0 @ bot) m) with
-           | Some (mf, m') =>
-             arb_init_mem_helper n' (m', cons (mf,frame_size) l)
-           | None => arb_init_mem_helper n' ml
-         end))
-  end.
-
-Definition arb_init_mem : G (memory * list (mframe * Z)):=
-  bindGen arbitrary (fun no_frames =>
-  arb_init_mem_helper no_frames (Memory.empty Atom, nil)).
-
-Definition arb_frame (m : memory) (mf : mframe) : G memory :=
-  match get_frame m mf with
-    | Some (Fr lab data) =>
-      bindGen (vectorOf (List.length data) (arbitrary)) (fun data' =>
-      match upd_frame m mf (Fr lab data') with
-        | Some m' => returnGen m'
-        | _ => pure m
-      end)
-    | _ => pure m
-  end.
-
-Definition arb_memory : G memory :=
-  bindGen arb_init_mem (fun ml =>
-  let (m, l) := ml in                           
-  let all_frames := [seq fst p | p <- l] in
-  foldGen (arb_frame) all_frames m).
-
-Instance GenSizedmemory : GenSized memory :=
-  {| arbitrarySized := fun _ => arb_memory |}.
-
-Derive GenSized for Ptr_atom.
-Derive GenSized for StackFrame.
-Derive GenSized for Stack.
-
-Derive GenSized for State.
-Derive GenSized for Variation.
-
-
+  Derive Fuzzy for BinOpT.
+  Derive Fuzzy for Instr.
+  Derive Fuzzy for Pointer.
+  Derive Fuzzy for Value.
+  Derive Fuzzy for Atom.
+  Derive Fuzzy for Ptr_atom.
+  Derive Fuzzy for StackFrame.
+  Derive Fuzzy for Stack.
+  Derive Fuzzy for State.
+  Derive Fuzzy for Variation.

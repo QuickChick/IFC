@@ -174,12 +174,19 @@ Definition register := Atom.
 Definition regSet := list register.
 
 (* Stack *)
-Record StackFrame := SF {
-  sf_return_addr : Ptr_atom;
-  sf_saved_regs : regSet;
-  sf_result_reg : regId;
-  sf_result_lab : Label
-}.
+Inductive StackFrame := SF : Ptr_atom -> regSet -> regId -> Label -> StackFrame.
+
+Definition sf_return_addr (sf : StackFrame) : Ptr_atom :=
+  let '(SF x _ _ _) := sf in x.
+
+Definition sf_saved_regs (sf : StackFrame) : regSet :=
+  let '(SF _ x _ _) := sf in x.
+
+Definition sf_result_reg (sf : StackFrame) : regId :=
+  let '(SF _ _ x _) := sf in x.
+
+Definition sf_result_lab (sf : StackFrame) : Label :=
+  let '(SF _ _ _ x) := sf in x.
 
 Inductive Stack : Type := ST : list StackFrame -> Stack.
 Definition unStack s := let 'ST xs := s in xs.
@@ -398,13 +405,22 @@ Qed.
 
 (* Machine states *)
 
-Record State := St {
-  st_imem  : imem;    (* instruction memory *)
-  st_mem   : memory;  (* data memory *)
-  st_stack : Stack;   (* operand stack *)
-  st_regs  : regSet;  (* register set *)
-  st_pc    : Ptr_atom (* program counter *)
-}.
+Inductive State := St : imem -> memory -> Stack -> regSet -> Ptr_atom -> State.
+
+Definition st_imem (st : State) : imem :=
+  let '(St x _ _ _ _) := st in x.
+
+Definition st_mem (st : State) : memory :=
+  let '(St _ x _ _ _) := st in x.
+
+Definition st_stack (st : State) : Stack :=
+  let '(St _ _ x _ _) := st in x.
+
+Definition st_regs (st : State) : regSet :=
+  let '(St _ _ _ x _) := st in x.
+
+Definition st_pc (st : State) : Ptr_atom :=
+  let '(St _ _ _ _ x) := st in x.
 
 Definition registerUpdate (rs : regSet) (r : regId) (a : Atom) :=
   update_list_Z rs r a.
