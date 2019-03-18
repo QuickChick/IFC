@@ -33,7 +33,7 @@ Definition qcfSSNI_copy_prop_0 :=
   fun v => propSSNI_helper (nth_table 0) v exp_result_opt_bool.
 
 Definition qcfSSNI_copy_loop_0 :=
-  fun (_ : unit) => fuzzLoop gen_variation_copy fuzz show qcfSSNI_copy_prop_0.
+  fun (_ : unit) => fuzzLoop (resize 3 gen_variation_copy) fuzz show qcfSSNI_copy_prop_0.
 
 Definition prop :=
   forAll (bindGen (resize 2 gen_variation_copy) fuzz) (fun v =>
