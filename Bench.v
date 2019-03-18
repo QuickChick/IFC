@@ -35,6 +35,18 @@ Definition qcfSSNI_copy_prop_0 :=
 Definition qcfSSNI_copy_loop_0 :=
   fun (_ : unit) => fuzzLoop gen_variation_copy fuzz show qcfSSNI_copy_prop_0.
 
+Definition prop :=
+  forAll (bindGen (resize 2 gen_variation_copy) fuzz) (fun v =>
+  match qcfSSNI_copy_prop_0 v with
+  | Some b => checker b
+  | None => checker tt
+  end).
+
+(*
+QuickChick prop.
+
+Sample (bindGen (resize 2 gen_variation_copy) fuzz).
+*)
 ManualExtract [BinOpT; Label; Instr; Pointer; Value; Atom; Ptr_atom; StackFrame; Stack; memframe; State; Variation].
 
 Extract Constant defNumTests => "100000".

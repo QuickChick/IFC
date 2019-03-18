@@ -77,11 +77,11 @@ Definition propSSNI_helper {A} (t : table) (v : Variation) (res : exp_result) : 
               if is_low_state st2' lab then
                 exp_check res (indist lab st1' st2') 
               else exp_success res
-            | _ => exp_success res
+            | _ => exp_reject res
             end
           else
             exp_check res (indist lab st1 st1')
-      | _ => exp_success res
+      | _ => exp_reject res
       end
     else exp_reject res.
 
