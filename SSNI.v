@@ -55,9 +55,11 @@ Definition exp_result_opt_bool : exp_result :=
    ; exp_check   := (fun b => Some b)
   |}.
   
+Require Import Reachability.
+
 Definition propSSNI_helper {A} (t : table) (v : Variation) (res : exp_result) : A  :=
     let '(Var lab st1 st2) := v in
-    if indist lab st1 st2 then
+    if indist lab st1 st2 && well_formed st1 && well_formed st2 then
       (* XXX Our generator should always give us this by design.
          If that's not the case the generator is broken. *)
       match fstep t st1  with
@@ -65,7 +67,7 @@ Definition propSSNI_helper {A} (t : table) (v : Variation) (res : exp_result) : 
         if is_low_state st1 lab then
           match fstep t st2 with
           | Some st2' =>
-             exp_check res (indist lab st1' st2')
+             exp_check res (indist lab st1' st2' && well_formed st1' && well_formed st2')
           | _ => exp_reject res
           (* XXX This used to fail the checker in ICFP paper.
              But here it does happen for Alloc, Store and BRet *)
@@ -75,12 +77,12 @@ Definition propSSNI_helper {A} (t : table) (v : Variation) (res : exp_result) : 
             match fstep t st2 with
             | Some st2' =>
               if is_low_state st2' lab then
-                exp_check res (indist lab st1' st2') 
+                exp_check res (indist lab st1' st2' && well_formed st1' && well_formed st2')  
               else exp_success res
             | _ => exp_reject res
             end
           else
-            exp_check res (indist lab st1 st1')
+            exp_check res (indist lab st1 st1' && well_formed st1')
       | _ => exp_reject res
       end
     else exp_reject res.
