@@ -21,8 +21,6 @@ Require Import Mutate.
 Definition testMutantX_ p n : Checker :=
   p (nth n (mutate_table default_table) default_table).
 
-Extract Constant defNumTests => "10000000".
-
 Definition rSSNI_smart := propSSNI_smart exp_result_random.
 Definition fSSNI_smart := propSSNI_smart exp_result_fuzz.
 Definition rSSNI_naive := propSSNI_arb   exp_result_random.
@@ -33,6 +31,5 @@ Definition nth_table n := nth n (mutate_table default_table) default_table.
 Definition es := "".
 
 ManualExtract [BinOpT; Label; Instr; Pointer; Value; Atom; Ptr_atom; StackFrame; Stack; memframe; State; Variation].
-QuickChickTimeout 3000.
 
 
