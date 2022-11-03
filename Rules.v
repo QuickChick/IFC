@@ -1,10 +1,11 @@
 Require Import List.
-Require Import Omega.
+Require Import Lia.
 Require Import Utils.
 Require Import Labels.
 Require Import Instructions.
 Require Import Coq.Unicode.Utf8.
 Require Import Coq.Vectors.Vector.
+Require Import ZArith.
 Set Implicit Arguments.
 
 (** This file defines the notion of rule, [AllowModify], and the
@@ -33,14 +34,20 @@ Inductive LAB (n: nat) : Type :=
 | lab4 : 4 <= n -> LAB n
 | labpc : LAB n.
 
+Arguments lab1 {n}.
+Arguments lab2 {n}.
+Arguments lab3 {n}.
+Arguments lab4 {n}.
+Arguments labpc {n}.
+
 Fixpoint nlem (n:nat) (m:nat) : n<=(n+m).
 refine
 (match m with
 | O => _ (le_n n)
 | S m' => _ (le_S _ _ (nlem n m'))
 end).
-intros; omega.
-intros; zify; omega.
+intros; lia.
+intros; zify; lia.
 Qed.
 
 Inductive rule_expr (n: nat) : Type :=
@@ -48,14 +55,22 @@ Inductive rule_expr (n: nat) : Type :=
 | L_Var: LAB n -> rule_expr n
 | L_Join: rule_expr n -> rule_expr n -> rule_expr n.
 
+Arguments L_Bot {n}.
+Arguments L_Var {n}.
+Arguments L_Join {n}.
+
 (** Side conditions for rules: the Allow part *)
 Inductive rule_scond (n : nat) : Type :=
-| A_True: @rule_scond n
-| A_LE:  rule_expr n -> rule_expr n -> @rule_scond n
-| A_And: @rule_scond n -> @rule_scond n -> @rule_scond n
-| A_Or: @rule_scond n -> @rule_scond n -> @rule_scond n
+| A_True: rule_scond n
+| A_LE:  rule_expr n -> rule_expr n -> rule_scond n
+| A_And: rule_scond n -> rule_scond n -> rule_scond n
+| A_Or: rule_scond n -> rule_scond n -> rule_scond n
 .
 
+Arguments A_True {n}.
+Arguments A_LE {n}.
+Arguments A_And {n}.
+Arguments A_Or {n}.
 
 (** * Rules *)
 (** The allow-modify part of a rule *)
@@ -128,14 +143,14 @@ let eval_var := mk_eval_var vlabs pclab in
 (** * Cosmetic notations for writing and applying rules *)
 Notation "'≪' c1 , e1 , lpc '≫'" := (almod c1 (Some e1) lpc) (at level 95, no associativity).
 Notation "'≪' c1 , '__' , lpc '≫'" := (almod c1 None lpc) (at level 95, no associativity).
-Notation "'LabPC'" := (L_Var (labpc _)).
+Notation "'LabPC'" := (L_Var (labpc)).
 Notation "'Lab1'" := (L_Var (lab1 (nlem _ _))).
 Notation "'Lab2'" := (L_Var (lab2 (nlem _ _))).
 Notation "'Lab3'" := (L_Var (lab3 (nlem _ _))).
 Notation "'Lab4'" := (L_Var (lab4 (nlem _ _))).
-Notation "'BOT'" := (L_Bot _).
+Notation "'BOT'" := (L_Bot).
 Notation "'JOIN'" := L_Join.
-Notation "'TRUE'" := (A_True _).
+Notation "'TRUE'" := (A_True).
 Notation "'AND'" := A_And.
 Notation "'OR'" := A_Or.
 Notation "'LE'" := A_LE.

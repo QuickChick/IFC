@@ -316,7 +316,7 @@ Fixpoint group_by A (e : A -> A -> bool) (xs : list A) : list (list A) :=
 Error: Cannot guess decreasing argument of fix. *)
 
 (* What I ended up writing for group_by *)
-Require Import Omega.
+Require Import Lia.
 Require Import Recdef.
 
 
@@ -344,7 +344,7 @@ Ltac arith_goal_ssrnat2coqnat :=
 Ltac ssromega :=
   repeat arith_hypo_ssrnat2coqnat;
   arith_goal_ssrnat2coqnat; simpl;
-  omega.
+  lia.
 
 Definition span' X (p : X -> bool) : forall (xs : list X),
     {x : list X * list X | le (length (snd x)) (length xs)}.
@@ -361,9 +361,9 @@ Definition span' X (p : X -> bool) : forall (xs : list X),
             else
               exist _ (nil,x::xs') _
       end).
-  simpl. omega.
-  simpl in *. destruct (span xs'). simpl. omega.
-  simpl. omega.
+  simpl. lia.
+  simpl in *. destruct (span xs'). simpl. lia.
+  simpl. lia.
 Defined.
 
 Function group_by (A : Type) (e : A -> A -> bool)
@@ -374,7 +374,7 @@ Function group_by (A : Type) (e : A -> A -> bool)
   | x::xs' => (x :: fst (proj1_sig (span' (e x) xs')))
               :: group_by e (snd (proj1_sig (span' (e x) xs')))
   end.
-intros. destruct (span' (e x) xs'). simpl. omega.
+intros. destruct (span' (e x) xs'). simpl. lia.
 Defined.
 
 (*
@@ -461,7 +461,8 @@ CoInductive trace (A : Type) : Type :=
   | TNil : trace A
   | TCons : A -> trace A -> trace A.
 
-Implicit Arguments TNil [A].
+Arguments TNil {A}.
+Arguments TCons {A}.
 
 Fixpoint list_to_trace (A : Type) (xs : list A) : trace A :=
   match xs with
@@ -533,7 +534,7 @@ Proof.
                                     by (rewrite Pos2Nat.inj_add; eauto).
 
   eapply nth_error_cons with (l:= l1) (a:= a) ; eauto.
-  zify; omega.
+  zify; lia.
 Qed.
 
 Lemma nth_error_Z_app:
@@ -544,9 +545,9 @@ Proof.
   simpl in *. subst. auto.
   simpl (length (a::l1)) in H.  zify.
   simpl.
-  replace i with (i - 1 + 1)%Z by omega.
-  erewrite <- nth_error_Z_cons by try omega.
-  eapply IHl1. omega.
+  replace i with (i - 1 + 1)%Z by lia.
+  erewrite <- nth_error_Z_cons by try lia.
+  eapply IHl1. lia.
 Qed.
 
 
@@ -564,10 +565,10 @@ Proof.
   inv H0.
   erewrite IHl1 ; eauto.
   intros. destruct i.
-  erewrite nth_error_Z_cons with (a:= t); eauto; try omega.
+  erewrite nth_error_Z_cons with (a:= t); eauto; try lia.
   erewrite H ; eauto.
-  erewrite nth_error_Z_cons with (a:= t); eauto; try (zify ; omega).
-  erewrite H ; eauto. symmetry. eapply nth_error_Z_cons; eauto. zify; omega.
+  erewrite nth_error_Z_cons with (a:= t); eauto; try (zify ; lia).
+  erewrite H ; eauto. symmetry. eapply nth_error_Z_cons; eauto. zify; lia.
   destruct l1, l2 ; auto.
 Qed.
 
@@ -612,7 +613,7 @@ Proof.
   exists x.
   destruct ((i <? 0)%Z) eqn:?; auto.
     apply Z.ltb_lt in Heqb.
-    omega.
+    lia.
 Qed.
 
 Fixpoint update_list A (xs : list A) (n : nat) (y : A) : option (list A) :=
@@ -692,7 +693,7 @@ Proof.
   destruct n; simpl in *; inv H.
   destruct n.
     destruct n'.
-      exfalso; omega.
+      exfalso; lia.
       destruct l'; inv H.
       simpl. auto.
     destruct n'.
@@ -840,7 +841,7 @@ Lemma update_list_Z_Some (T:Type): forall (v:T) l (i:Z),
 Proof.
   intros. unfold update_list_Z.
   destruct (i <? 0)%Z eqn:?.
-  - rewrite -> Z.ltb_lt in Heqb. omega.
+  - rewrite -> Z.ltb_lt in Heqb. lia.
   - eapply update_list_Some; eauto.
 Qed.
 
@@ -1089,7 +1090,7 @@ Proof.
   destruct (dropZ (Z.of_nat (size xs)) xs) eqn:E. auto.
   exfalso.
   unfold dropZ in E.  destruct (Z.of_nat (size xs) <? 0)%Z eqn:M.
-    apply Z.ltb_lt in M.  omega.
+    apply Z.ltb_lt in M.  lia.
   rewrite Nat2Z.id in E.
   assert (size (drop (size xs) xs) = size (x::l)). rewrite E; auto.
   by rewrite size_drop /= ssrnat.subnn in H.
@@ -1102,7 +1103,7 @@ Lemma dropZ_nil :
     (i >= Z.of_nat (size l))%Z.
 Proof.
   intros.
-  destruct (Z_lt_dec i (Z.of_nat (size l))) as [H|]; try omega; try ssromega.
+  destruct (Z_lt_dec i (Z.of_nat (size l))) as [H|]; try lia; try ssromega.
   unfold dropZ in *.
   destruct (Z.ltb_spec0 i 0); try ssromega.
   rewrite -> Z2Nat.inj_lt in H; try ssromega.
@@ -1130,7 +1131,7 @@ Lemma nth_error_Z_dropZ_zero :
 Proof.
   intros.
   unfold nth_error_Z, dropZ.
-  destruct (Z.ltb_spec0 i 0); try omega.
+  destruct (Z.ltb_spec0 i 0); try lia.
   rewrite nth_error_drop_zero.
   reflexivity.
 Qed.
@@ -1215,16 +1216,16 @@ Proof.
   inv H.
   destruct (z' <? 0)%Z eqn:Ez.
   - rewrite -> Z.ltb_lt in Ez.
-    destruct Z_lt_dec; try omega.
-    destruct Z_le_dec; auto; omega.
+    destruct Z_lt_dec; try lia.
+    destruct Z_le_dec; auto; lia.
   - assert (~ (z' < 0 )%Z).
     rewrite <- Z.ltb_lt; try congruence.
-    destruct Z_le_dec; try omega; simpl in *; inv H.
+    destruct Z_le_dec; try lia; simpl in *; inv H.
     rewrite (_ : is_left (Z_lt_dec z' z) = (Z.to_nat z' < Z.to_nat z)).
       elim: (Z.to_nat z') (Z.to_nat z) {n Ez H0 l0}=> [|n IH] [|n'] //=.
       by rewrite IH ltnS.
     assert ( (z'<z)%Z <-> (Z.to_nat z' < Z.to_nat z)%coq_nat).
-      apply Z2Nat.inj_lt; try omega.
+      apply Z2Nat.inj_lt; try lia.
     by apply/sumboolP/ltP; intuition.
 Qed.
 
@@ -1297,7 +1298,7 @@ Proof.
   destruct (Z.of_nat i <? 0)%Z eqn:H; simpl in *; auto.
   - apply Z.ltb_lt in H.
     pose proof (Zle_0_nat i).
-    omega.
+    lia.
   - rewrite !Nat2Z.id in Eq.
     auto.
 Qed.
@@ -1331,7 +1332,7 @@ Proof.
   destruct (Z.of_nat i <? 0)%Z eqn:H; simpl in *; auto.
   - apply Z.ltb_lt in H.
     pose proof (Zle_0_nat i).
-    omega.
+    lia.
   - rewrite !Nat2Z.id in Eq.
     auto.
 Qed.

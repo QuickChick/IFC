@@ -134,7 +134,7 @@ Definition pc_eq (pc1 pc2 : Ptr_atom) : bool :=
 
 Definition reg_eq_dec : forall r1 r2 : regId,
   {r1 = r2} + {r1 <> r2}.
-Proof. apply Z_eq_dec. Defined.
+Proof. apply Z.eq_dec. Defined.
 
 Hint Resolve reg_eq_dec.
 
@@ -466,7 +466,7 @@ Inductive step (t : table) : State -> State -> Prop :=
      (RES : registerUpdate r r2 (Vlab C @ rl) = Some r'),
      step t
        (St im μ σ r pc)
-       (St im μ σ r' (PAtm (Zsucc j) rpcl))
+       (St im μ σ r' (PAtm (Z.succ j) rpcl))
  | step_putlab: forall im μ σ pc r r' r1 j LPC rl rpcl l
      (PC: pc = PAtm j LPC)
      (CODE: im`[pc] = Some (PutLab l r1))

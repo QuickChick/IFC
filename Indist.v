@@ -20,28 +20,24 @@ Class Indist (A : Type) : Type := {
 Arguments indistxx {_ _} [obs] _.
 Arguments indist_sym {_ _} [obs] _ _.
 
-Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
-
+#[refine] Instance oindist {T : Type} `{Indist T} : Indist (option T) := {
   indist obs x1 x2 :=
     match x1, x2 with
     | None, None => true
     | Some x1, Some x2 => indist obs x1 x2
     | _, _ => false
-    end
-
-}.
-
+    end;
+  }.
 Proof.
 - abstract by move => obs [x|//=]; rewrite indistxx.
 - abstract by move => obs [x|//=] [y|//=]; rewrite indist_sym.
 Defined.
 
-Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
+#[refine] Instance indistList {A : Type} `{Indist A} : Indist (list A) :=
 {|
   indist lab l1 l2 :=
     (size l1 == size l2) && all (fun p => indist lab p.1 p.2) (zip l1 l2)
 |}.
-
 Proof.
 - abstract by move => obs; elim => [|x l IH] //=; rewrite indistxx IH.
 - abstract by move => obs; elim => [|x1 l1 IH] [|x2 l2] //=;
@@ -57,11 +53,11 @@ Proof. by rewrite {1 3}/indist /= eqSS; bool_congr. Qed.
    - Ignores the label (called only on unlabeled things)
    - Just syntactic equality thanks to the per-stamp-level allocator!
 *)
-Instance indistValue : Indist Value :=
+
+#[refine] Instance indistValue : Indist Value :=
 {|
   indist _lab v1 v2 := v1 == v2
 |}.
-
 Proof.
 - abstract by move => _; exact: eqxx.
 - abstract by move=> _; exact: eq_sym.
@@ -74,7 +70,8 @@ Defined.
        the values must be indistinguishable
      * Else if they are not lower, the label equality suffices
 *)
-Instance indistAtom : Indist Atom :=
+
+#[refine] Instance indistAtom : Indist Atom :=
 {|
   indist lab a1 a2 :=
     let '(Atm v1 l1) := a1 in
@@ -82,14 +79,13 @@ Instance indistAtom : Indist Atom :=
     (l1 == l2)
     && (isHigh l1 lab || indist lab v1 v2)
 |}.
-
 Proof.
 - abstract by move => obs [v l]; rewrite eqxx indistxx orbT.
 - abstract by move=> obs [v1 l1] [v2 l2]; rewrite eq_sym indist_sym;
   case: eqP=> [->|] //=.
 Defined.
 
-Instance indistFrame : Indist frame :=
+#[refine] Instance indistFrame : Indist frame :=
 {|
   indist lab f1 f2 :=
     let '(Fr l1 vs1) := f1 in
@@ -98,7 +94,6 @@ Instance indistFrame : Indist frame :=
            try to remove this duplication at some point *)
     (l1 == l2) && (isHigh l1 lab || indist lab vs1 vs2)
 |}.
-
 Proof.
 - abstract by move => obs [l vs]; rewrite !eqxx indistxx orbT /=.
 - abstract by move=> obs [v1 l1] [v2 l2]; rewrite eq_sym indist_sym;
@@ -119,12 +114,11 @@ Definition indistMemAsym lab m1 m2 :=
          indist lab (get_memframe m1 b) (get_memframe m2 b))
       (blocks_stamped_below lab m1).
 
-Instance indistMem : Indist memory :=
+#[refine] Instance indistMem : Indist memory :=
 {|
   indist lab m1 m2 :=
     indistMemAsym lab m1 m2 && indistMemAsym lab m2 m1
 |}.
-
 Proof.
 - abstract by move=> obs m; rewrite andbb /indistMemAsym;
   apply/allP=> b b_in; rewrite indistxx.
@@ -151,7 +145,7 @@ Qed.
      * The returning labels must be equal
 *)
 
-Instance indistStackFrame : Indist StackFrame :=
+#[refine] Instance indistStackFrame : Indist StackFrame :=
 {|
   indist lab sf1 sf2 :=
     match sf1, sf2 with
@@ -168,7 +162,7 @@ Proof.
   rewrite orbC (eq_sym ra1) indist_sym (eq_sym rr1) (eq_sym rl1).
 Defined.
 
-Instance indistStack : Indist Stack :=
+#[refine] Instance indistStack : Indist Stack :=
 {|
   indist lab s1 s2 :=
     indist lab (unStack s1) (unStack s2)
@@ -178,7 +172,7 @@ Proof.
 - abstract by move=> obs s1 s2; exact: indist_sym.
 Defined.
 
-Instance indistImems : Indist imem :=
+#[refine] Instance indistImems : Indist imem :=
 {|
   indist _lab imem1 imem2 := imem1 == imem2 :> seq (@Instr Label)
 |}.
@@ -218,7 +212,7 @@ have [l /=|/norP [/negbTE -> /negbTE ->]] := boolP (_ || _) => /andP [ind_sf ind
 by move: ind_stk; rewrite -!lock; apply: IH.
 Qed.
 
-Instance indistState : Indist State :=
+#[refine] Instance indistState : Indist State :=
 {|
   indist lab st1 st2 :=
     [&& indist lab (st_imem st1) (st_imem st2),

@@ -21,6 +21,7 @@ Require Export ZArith.
 Require Export Znumtheory.
 Require Export List.
 Require Export Bool.
+Require Export Lia.
 
 (** * Useful tactics *)
 
@@ -46,7 +47,7 @@ Ltac byContradiction :=
   cut False; [contradiction|idtac].
 
 Ltac omegaContradiction :=
-  cut False; [contradiction|omega].
+  cut False; [contradiction|lia].
 
 Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
 Proof. auto. Qed.
@@ -128,21 +129,21 @@ Lemma Plt_trans:
 Proof (Pos.lt_trans).
 
 Lemma Plt_succ:
-  forall (x: positive), Plt x (Psucc x).
+  forall (x: positive), Plt x (Pos.succ x).
 Proof.
   unfold Plt; intros. apply Pos.lt_succ_r. apply Pos.le_refl. 
 Qed.
 Hint Resolve Plt_succ: coqlib.
 
 Lemma Plt_trans_succ:
-  forall (x y: positive), Plt x y -> Plt x (Psucc y).
+  forall (x y: positive), Plt x y -> Plt x (Pos.succ y).
 Proof.
   intros. apply Plt_trans with y. assumption. apply Plt_succ.
 Qed.
 Hint Resolve Plt_succ: coqlib.
 
 Lemma Plt_succ_inv:
-  forall (x y: positive), Plt x (Psucc y) -> Plt x y \/ x = y.
+  forall (x y: positive), Plt x (Pos.succ y) -> Plt x y \/ x = y.
 Proof.
   unfold Plt; intros. rewrite Pos.lt_succ_r in H. 
   apply Pos.le_lteq; auto.
@@ -168,7 +169,7 @@ Proof (Pos.le_trans).
 Lemma Plt_Ple: forall (p q: positive), Plt p q -> Ple p q.
 Proof (Pos.lt_le_incl).
 
-Lemma Ple_succ: forall (p: positive), Ple p (Psucc p).
+Lemma Ple_succ: forall (p: positive), Ple p (Pos.succ p).
 Proof.
   intros. apply Plt_Ple. apply Plt_succ.
 Qed.
@@ -182,7 +183,7 @@ Proof (Pos.lt_irrefl).
 
 Hint Resolve Ple_refl Plt_Ple Ple_succ Plt_strict: coqlib.
 
-Ltac xomega := unfold Plt, Ple in *; zify; omega.
+Ltac xomega := unfold Plt, Ple in *; zify; lia.
 Ltac xomegaContradiction := exfalso; xomega.
 
 (** Peano recursion over positive numbers. *)
@@ -200,16 +201,18 @@ Variable v1: A.
 Variable f: positive -> A -> A.
 
 Lemma Ppred_Plt:
-  forall x, x <> xH -> Plt (Ppred x) x.
+  forall x, x <> xH -> Plt (Pos.pred x) x.
 Proof.
-  intros. elim (Psucc_pred x); intro. contradiction.
-  set (y := Ppred x) in *. rewrite <- H0. apply Plt_succ.
+  intros. elim (Pos.succ_pred x); auto.
+  set (y := Pos.pred x) in *.
+  rewrite Pos.pred_succ.
+  apply Plt_succ.
 Qed.
 
 Let iter (x: positive) (P: forall y, Plt y x -> A) : A :=
   match peq x xH with
   | left EQ => v1
-  | right NOTEQ => f (Ppred x) (P (Ppred x) (Ppred_Plt x NOTEQ))
+  | right NOTEQ => f (Pos.pred x) (P (Pos.pred x) (Ppred_Plt x NOTEQ))
   end.
 
 Definition positive_rec : positive -> A :=
@@ -231,18 +234,18 @@ Proof.
 Qed.
 
 Lemma positive_rec_succ:
-  forall x, positive_rec (Psucc x) = f x (positive_rec x).
+  forall x, positive_rec (Pos.succ x) = f x (positive_rec x).
 Proof.
   intro. rewrite unroll_positive_rec. unfold iter.
-  case (peq (Psucc x) 1); intro.
+  case (peq (Pos.succ x) 1); intro.
   destruct x; simpl in e; discriminate.
-  rewrite Ppred_succ. auto.
+  rewrite Pos.pred_succ. auto.
 Qed.
 
 Lemma positive_Peano_ind:
   forall (P: positive -> Prop),
   P xH ->
-  (forall x, P x -> P (Psucc x)) ->
+  (forall x, P x -> P (Pos.succ x)) ->
   forall x, P x.
 Proof.
   intros.
@@ -250,8 +253,11 @@ Proof.
   intros. 
   case (peq x0 xH); intro.
   subst x0; auto.
-  elim (Psucc_pred x0); intro. contradiction. rewrite <- H2.
-  apply H0. apply H1. apply Ppred_Plt. auto. 
+  elim (Pos.succ_pred x0); auto.
+  apply H0.
+  apply H1.
+  apply Ppred_Plt.
+  auto.
 Qed.
 
 End POSITIVE_ITERATION.
@@ -325,90 +331,91 @@ Proof. reflexivity. Qed.
 
 Lemma two_power_nat_pos : forall n : nat, two_power_nat n > 0.
 Proof.
-  induction n. rewrite two_power_nat_O. omega.
-  rewrite two_power_nat_S. omega.
+  induction n. rewrite two_power_nat_O. lia.
+  rewrite two_power_nat_S. lia.
 Qed.
 
 Lemma two_power_nat_two_p:
   forall x, two_power_nat x = two_p (Z_of_nat x).
 Proof.
   induction x. auto. 
-  rewrite two_power_nat_S. rewrite inj_S. rewrite two_p_S. omega. omega.
+  rewrite two_power_nat_S. rewrite inj_S. rewrite two_p_S. lia. lia.
 Qed.
 
 Lemma two_p_monotone:
   forall x y, 0 <= x <= y -> two_p x <= two_p y.
 Proof.
   intros.
-  replace (two_p x) with (two_p x * 1) by omega. 
-  replace y with (x + (y - x)) by omega.
-  rewrite two_p_is_exp; try omega.
+  replace (two_p x) with (two_p x * 1) by lia. 
+  replace y with (x + (y - x)) by lia.
+  rewrite two_p_is_exp; try lia.
   apply Zmult_le_compat_l.
-  assert (two_p (y - x) > 0). apply two_p_gt_ZERO. omega. omega.
-  assert (two_p x > 0). apply two_p_gt_ZERO. omega. omega.
+  assert (two_p (y - x) > 0). apply two_p_gt_ZERO. lia. lia.
+  assert (two_p x > 0). apply two_p_gt_ZERO. lia. lia.
 Qed.
 
 Lemma two_p_monotone_strict:
   forall x y, 0 <= x < y -> two_p x < two_p y.
 Proof.
-  intros. assert (two_p x <= two_p (y - 1)). apply two_p_monotone; omega.
-  assert (two_p (y - 1) > 0). apply two_p_gt_ZERO. omega.
-  replace y with (Zsucc (y - 1)) by omega. rewrite two_p_S. omega. omega.
+  intros. assert (two_p x <= two_p (y - 1)). apply two_p_monotone; lia.
+  assert (two_p (y - 1) > 0). apply two_p_gt_ZERO. lia.
+  replace y with (Z.succ (y - 1)) by lia. rewrite two_p_S. lia. lia.
 Qed.
 
 Lemma two_p_strict:
   forall x, x >= 0 -> x < two_p x.
 Proof.
   intros x0 GT. pattern x0. apply natlike_ind.
-  simpl. omega.
-  intros. rewrite two_p_S; auto. generalize (two_p_gt_ZERO x H). omega. 
-  omega.
+  simpl. lia.
+  intros. rewrite two_p_S; auto. generalize (two_p_gt_ZERO x H). lia. 
+  lia.
 Qed.
 
 Lemma two_p_strict_2:
   forall x, x >= 0 -> 2 * x - 1 < two_p x.
 Proof.
-  intros. assert (x = 0 \/ x - 1 >= 0) by omega. destruct H0.
+  intros. assert (x = 0 \/ x - 1 >= 0) by lia. destruct H0.
   subst. vm_compute. auto.
   replace (two_p x) with (2 * two_p (x - 1)).
-  generalize (two_p_strict _ H0). omega. 
-  rewrite <- two_p_S. decEq. omega. omega.
+  generalize (two_p_strict _ H0). lia. 
+  rewrite <- two_p_S. decEq. lia. lia.
 Qed.
 
 (** Properties of [Zmin] and [Zmax] *)
 
 Lemma Zmin_spec:
-  forall x y, Zmin x y = if zlt x y then x else y.
+  forall x y, Z.min x y = if zlt x y then x else y.
 Proof.
-  intros. case (zlt x y); unfold Zlt, Zge; intro z.
-  unfold Zmin. rewrite z. auto.
-  unfold Zmin. caseEq (x ?= y); intro. 
+  intros. case (zlt x y); unfold Z.lt, Z.ge; intro z.
+  unfold Z.min. rewrite z. auto.
+  unfold Z.min. caseEq (x ?= y); intro. 
   apply Zcompare_Eq_eq. auto.
   contradiction.
   reflexivity.
 Qed.
 
 Lemma Zmax_spec:
-  forall x y, Zmax x y = if zlt y x then x else y.
+  forall x y, Z.max x y = if zlt y x then x else y.
 Proof.
-  intros. case (zlt y x); unfold Zlt, Zge; intro z.
-  unfold Zmax. rewrite <- (Zcompare_antisym y x).
+  intros. case (zlt y x); unfold Z.lt, Z.ge; intro z.
+  unfold Z.max. rewrite <- (Zcompare_antisym y x).
   rewrite z. simpl. auto.
-  unfold Zmax. rewrite <- (Zcompare_antisym y x).
+  unfold Z.max. rewrite <- (Zcompare_antisym y x).
   caseEq (y ?= x); intro; simpl.
   symmetry. apply Zcompare_Eq_eq. auto.
   contradiction. reflexivity.
 Qed.
 
 Lemma Zmax_bound_l:
-  forall x y z, x <= y -> x <= Zmax y z.
+  forall x y z, x <= y -> x <= Z.max y z.
 Proof.
-  intros. generalize (Zmax1 y z). omega.
+  intros. generalize (Zmax1 y z). lia.
 Qed.
+
 Lemma Zmax_bound_r:
-  forall x y z, x <= z -> x <= Zmax y z.
+  forall x y z, x <= z -> x <= Z.max y z.
 Proof.
-  intros. generalize (Zmax2 y z). omega.
+  intros. generalize (Zmax2 y z). lia.
 Qed.
 
 (** Properties of Euclidean division and modulus. *)
@@ -416,19 +423,19 @@ Qed.
 Lemma Zdiv_small:
   forall x y, 0 <= x < y -> x / y = 0.
 Proof.
-  intros. assert (y > 0). omega. 
+  intros. assert (y > 0). lia. 
   assert (forall a b,
     0 <= a < y ->
     0 <= y * b + a < y ->
     b = 0).
   intros. 
-  assert (b = 0 \/ b > 0 \/ (-b) > 0). omega.
+  assert (b = 0 \/ b > 0 \/ (-b) > 0). lia.
   elim H3; intro.
   auto.
   elim H4; intro.
-  assert (y * b >= y * 1). apply Zmult_ge_compat_l. omega. omega. 
+  assert (y * b >= y * 1). apply Zmult_ge_compat_l. lia. lia. 
   omegaContradiction. 
-  assert (y * (-b) >= y * 1). apply Zmult_ge_compat_l. omega. omega.
+  assert (y * (-b) >= y * 1). apply Zmult_ge_compat_l. lia. lia.
   rewrite <- Zopp_mult_distr_r in H6. omegaContradiction.
   apply H1 with (x mod y). 
   apply Z_mod_lt. auto.
@@ -438,9 +445,9 @@ Qed.
 Lemma Zmod_small:
   forall x y, 0 <= x < y -> x mod y = x.
 Proof.
-  intros. assert (y > 0). omega.
+  intros. assert (y > 0). lia.
   generalize (Z_div_mod_eq x y H0). 
-  rewrite (Zdiv_small x y H). omega.
+  rewrite (Zdiv_small x y H). lia.
 Qed.
 
 Lemma Zmod_unique:
@@ -448,7 +455,7 @@ Lemma Zmod_unique:
   x = a * y + b -> 0 <= b < y -> x mod y = b.
 Proof.
   intros. subst x. rewrite Zplus_comm. 
-  rewrite Z_mod_plus. apply Zmod_small. auto. omega.
+  rewrite Z_mod_plus. apply Zmod_small. auto. lia.
 Qed.
 
 Lemma Zdiv_unique:
@@ -456,7 +463,7 @@ Lemma Zdiv_unique:
   x = a * y + b -> 0 <= b < y -> x / y = a.
 Proof.
   intros. subst x. rewrite Zplus_comm.
-  rewrite Z_div_plus. rewrite (Zdiv_small b y H0). omega. omega.
+  rewrite Z_div_plus. rewrite (Zdiv_small b y H0). lia. lia.
 Qed.
 
 Lemma Zdiv_Zdiv:
@@ -471,22 +478,22 @@ Proof.
   symmetry. apply Zdiv_unique with (r2 * b + r1). 
   rewrite H2. rewrite H4. ring.
   split. 
-  assert (0 <= r2 * b). apply Zmult_le_0_compat. omega. omega. omega.
+  assert (0 <= r2 * b). apply Zmult_le_0_compat. lia. lia. lia.
   assert ((r2 + 1) * b <= c * b).
-  apply Zmult_le_compat_r. omega. omega. 
+  apply Zmult_le_compat_r. lia. lia. 
   replace ((r2 + 1) * b) with (r2 * b + b) in H5 by ring.
   replace (c * b) with (b * c) in H5 by ring.
-  omega.
+  lia.
 Qed.
 
 Lemma Zmult_le_compat_l_neg :
   forall n m p:Z, n >= m -> p <= 0 -> p * n <= p * m.
 Proof.
   intros.
-  assert ((-p) * n >= (-p) * m). apply Zmult_ge_compat_l. auto. omega.
+  assert ((-p) * n >= (-p) * m). apply Zmult_ge_compat_l. auto. lia.
   replace (p * n) with (- ((-p) * n)) by ring.
   replace (p * m) with (- ((-p) * m)) by ring.
-  omega.
+  lia.
 Qed.
 
 Lemma Zdiv_interval_1:
@@ -500,14 +507,14 @@ Proof.
   set (q := a/b) in *. set (r := a mod b) in *.
   split.
   assert (lo < (q + 1)).
-  apply Zmult_lt_reg_r with b. omega.  
-  apply Zle_lt_trans with a. omega. 
+  apply Zmult_lt_reg_r with b. lia.  
+  apply Z.le_lt_trans with a. lia. 
   replace ((q + 1) * b) with (b * q + b) by ring.
-  omega.
-  omega.
-  apply Zmult_lt_reg_r with b. omega. 
+  lia.
+  lia.
+  apply Zmult_lt_reg_r with b. lia. 
   replace (q * b) with (b * q) by ring.
-  omega.
+  lia.
 Qed.
 
 Lemma Zdiv_interval_2:
@@ -517,13 +524,13 @@ Lemma Zdiv_interval_2:
 Proof.
   intros.
   assert (lo <= a / b < hi+1).
-  apply Zdiv_interval_1. omega. omega. auto.
-  assert (lo * b <= lo * 1). apply Zmult_le_compat_l_neg. omega. omega. 
+  apply Zdiv_interval_1. lia. lia. auto.
+  assert (lo * b <= lo * 1). apply Zmult_le_compat_l_neg. lia. lia. 
   replace (lo * 1) with lo in H3 by ring.
-  assert ((hi + 1) * 1 <= (hi + 1) * b). apply Zmult_le_compat_l. omega. omega.
+  assert ((hi + 1) * 1 <= (hi + 1) * b). apply Zmult_le_compat_l. lia. lia.
   replace ((hi + 1) * 1) with (hi + 1) in H4 by ring.
-  omega.
-  omega.
+  lia.
+  lia.
 Qed.
 
 Lemma Zmod_recombine:
@@ -541,10 +548,10 @@ Proof.
   generalize (Z_mod_lt x b H0). intro. 
   generalize (Z_mod_lt xb a H). intro.
   assert (0 <= xb mod a * b <= a * b - b).
-    split. apply Zmult_le_0_compat; omega.
+    split. apply Zmult_le_0_compat; lia.
     replace (a * b - b) with ((a - 1) * b) by ring.
-    apply Zmult_le_compat; omega. 
-  omega.
+    apply Zmult_le_compat; lia. 
+  lia.
 Qed.
 
 (** Properties of divisibility. *)
@@ -561,7 +568,7 @@ Proof.
   intros. destruct (zeq (Zmod q p) 0).
   left. exists (q / p). 
   transitivity (p * (q / p) + (q mod p)). apply Z_div_mod_eq; auto.
-  transitivity (p * (q / p)). omega. ring.
+  transitivity (p * (q / p)). lia. ring.
   right; red; intros. elim n. apply Z_div_exact_1; auto. 
   inv H0. rewrite Z_div_mult; auto. ring.
 Defined.
@@ -572,9 +579,9 @@ Lemma Zdivide_interval:
   0 < c -> 0 <= a < b -> (c | a) -> (c | b) -> 0 <= a <= b - c.
 Proof.
   intros. destruct H1 as [x EQ1]. destruct H2 as [y EQ2]. subst. destruct H0.
-  split. omega. exploit Zmult_lt_reg_r; eauto. intros. 
+  split. lia. exploit Zmult_lt_reg_r; eauto. intros. 
   replace (y * c - c) with ((y - 1) * c) by ring.
-  apply Zmult_le_compat_r; omega.
+  apply Zmult_le_compat_r; lia.
 Qed.
 
 (** Conversion from [Z] to [nat]. *)
@@ -588,9 +595,9 @@ Proof.
 Qed.
 
 Lemma nat_of_Z_max:
-  forall z, Z_of_nat (nat_of_Z z) = Zmax z 0.
+  forall z, Z_of_nat (nat_of_Z z) = Z.max z 0.
 Proof.
-  intros. unfold Zmax. destruct z; simpl; auto. 
+  intros. unfold Z.max. destruct z; simpl; auto. 
   change (Z.of_nat (Z.to_nat (Zpos p)) = Zpos p).
   apply Z2Nat.id. compute; intuition congruence. 
 Qed.
@@ -598,13 +605,13 @@ Qed.
 Lemma nat_of_Z_eq:
   forall z, z >= 0 -> Z_of_nat (nat_of_Z z) = z.
 Proof.
-  unfold nat_of_Z; intros. apply Z2Nat.id. omega.
+  unfold nat_of_Z; intros. apply Z2Nat.id. lia.
 Qed.
 
 Lemma nat_of_Z_neg:
   forall n, n <= 0 -> nat_of_Z n = O.
 Proof.
-  destruct n; unfold Zle; simpl; auto. congruence.
+  destruct n; unfold Z.le; simpl; auto. congruence.
 Qed.
 
 Lemma nat_of_Z_plus:
@@ -612,7 +619,7 @@ Lemma nat_of_Z_plus:
   p >= 0 -> q >= 0 ->
   nat_of_Z (p + q) = (nat_of_Z p + nat_of_Z q)%nat.
 Proof.
-  unfold nat_of_Z; intros. apply Z2Nat.inj_add; omega. 
+  unfold nat_of_Z; intros. apply Z2Nat.inj_add; lia. 
 Qed.
 
 
@@ -628,8 +635,8 @@ Proof.
   generalize (Z_div_mod_eq (x + y - 1) y H). intro.
   replace ((x + y - 1) / y * y) 
      with ((x + y - 1) - (x + y - 1) mod y).
-  generalize (Z_mod_lt (x + y - 1) y H). omega.
-  rewrite Zmult_comm. omega.
+  generalize (Z_mod_lt (x + y - 1) y H). lia.
+  rewrite Zmult_comm. lia.
 Qed.
 
 Lemma align_divides: forall x y, y > 0 -> (y | align x y).
@@ -702,7 +709,7 @@ Hint Resolve nth_error_nil: coqlib.
 Fixpoint list_length_z_aux (A: Type) (l: list A) (acc: Z) {struct l}: Z :=
   match l with
   | nil => acc
-  | hd :: tl => list_length_z_aux tl (Zsucc acc)
+  | hd :: tl => list_length_z_aux tl (Z.succ acc)
   end.
 
 Remark list_length_z_aux_shift:
@@ -710,8 +717,8 @@ Remark list_length_z_aux_shift:
   list_length_z_aux l n = list_length_z_aux l m + (n - m).
 Proof.
   induction l; intros; simpl.
-  omega.
-  replace (n - m) with (Zsucc n - Zsucc m) by omega. auto.
+  lia.
+  replace (n - m) with (Z.succ n - Z.succ m) by lia. auto.
 Qed.
 
 Definition list_length_z (A: Type) (l: list A) : Z :=
@@ -722,15 +729,15 @@ Lemma list_length_z_cons:
   list_length_z (hd :: tl) = list_length_z tl + 1.
 Proof.
   intros. unfold list_length_z. simpl.
-  rewrite (list_length_z_aux_shift tl 1 0). omega. 
+  rewrite (list_length_z_aux_shift tl 1 0). lia. 
 Qed.
 
 Lemma list_length_z_pos:
   forall (A: Type) (l: list A),
   list_length_z l >= 0.
 Proof.
-  induction l; simpl. unfold list_length_z; simpl. omega. 
-  rewrite list_length_z_cons. omega.
+  induction l; simpl. unfold list_length_z; simpl. lia. 
+  rewrite list_length_z_cons. lia.
 Qed.
 
 Lemma list_length_z_map:
@@ -746,7 +753,7 @@ Qed.
 Fixpoint list_nth_z (A: Type) (l: list A) (n: Z) {struct l}: option A :=
   match l with
   | nil => None
-  | hd :: tl => if zeq n 0 then Some hd else list_nth_z tl (Zpred n)
+  | hd :: tl => if zeq n 0 then Some hd else list_nth_z tl (Z.pred n)
   end.
 
 Lemma list_nth_z_in:
@@ -774,8 +781,8 @@ Proof.
   induction l; simpl; intros.
   discriminate.
   rewrite list_length_z_cons. destruct (zeq n 0).
-  generalize (list_length_z_pos l); omega.
-  exploit IHl; eauto. unfold Zpred. omega. 
+  generalize (list_length_z_pos l); lia.
+  exploit IHl; eauto. unfold Z.pred. lia. 
 Qed.
 
 (** Properties of [List.incl] (list inclusion). *)
@@ -1264,10 +1271,8 @@ Qed.
 
 (** * Definitions and theorems over boolean types *)
 
-Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
+Definition proj_sumbool {P Q: Prop} (a: {P} + {Q}) : bool :=
   if a then true else false.
-
-Implicit Arguments proj_sumbool [P Q].
 
 Coercion proj_sumbool: sumbool >-> bool.
 

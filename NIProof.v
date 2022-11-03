@@ -5,7 +5,7 @@ From mathcomp Require Import finset path fingraph. (* These depend on Mathematic
 
 Require Import Utils Labels Rules Memory Instructions Machine Indist NotionsOfNI.
 
-Require Import Omega. 
+Require Import Lia.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -18,7 +18,8 @@ Proof.
 by elim: n=> //= n ->.
 Qed.
 
-Definition def_atom := Vint 0 @ ⊥.
+
+Definition def_atom := Vint BinNums.Z0 @ ⊥.
 
 Lemma nth_errorE T l n (a def : T) : List.nth_error l n = Some a ->
   nth def l n = a /\ n < size l.
@@ -29,7 +30,7 @@ Qed.
 Lemma nth_error_ZE T l n (a def : T) : nth_error_Z l n = Some a ->
   nth def l (BinInt.Z.to_nat n) = a /\ BinInt.Z.to_nat n < size l.
 Proof.
-by rewrite /nth_error_Z; case: (BinInt.Z.ltb n 0) => //; apply: nth_errorE.
+by rewrite /nth_error_Z; case: (BinInt.Z.ltb n BinNums.Z0) => //; apply: nth_errorE.
 Qed.
 
 Lemma update_listE T r r' (def : T) rk a : update_list r rk a = Some r' ->
@@ -45,7 +46,7 @@ Lemma update_list_ZE r r' rk a : update_list_Z r rk a = Some r' ->
   r' = set_nth def_atom r (BinInt.Z.to_nat rk) a /\
   BinInt.Z.to_nat rk < size r.
 Proof.
-rewrite /update_list_Z; case: (BinInt.Z.ltb rk 0)=> //.
+rewrite /update_list_Z; case: (BinInt.Z.ltb rk BinNums.Z0)=> //.
 exact: update_listE.
 Qed.
 
@@ -229,7 +230,7 @@ Lemma stamp_alloc μ μ' sz lab stamp i li fp :
   Memory.stamp fp = stamp.
 Proof.
 rewrite /alloc /zreplicate.
-case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz [alloc_sz].
+case: (ZArith_dec.Z_lt_dec sz BinNums.Z0) => // lt0sz [alloc_sz].
 by rewrite (alloc_stamp alloc_sz).
 Qed.
 
@@ -238,7 +239,7 @@ Lemma reachable_alloc_int μ μ' sz lab stamp i li fp l f1 f2 :
   reachable l μ' f1 f2 = reachable l μ f1 f2.
 Proof.
 rewrite /alloc /zreplicate.
-case: (ZArith_dec.Z_lt_dec sz 0) => // lt0sz /= [alloc_sz].
+case: (ZArith_dec.Z_lt_dec sz BinNums.Z0) => // lt0sz /= [alloc_sz].
 apply/eq_connect=> x y.
 rewrite /link.
 have [<-|neq_fpx] := fp =P x.
@@ -372,7 +373,7 @@ case: {st st'} step.
 (* Alloc *)
 + move=> im μ μ' σ pc r r' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> ? get_r1 get_r2 [<- <-] alloc_i.
   move: (alloc_i); rewrite /alloc.
-  case: (zreplicate i (Vint 0 @ ⊥)) => // ? [malloc].
+  case: (zreplicate i (Vint BinNums.Z0 @ ⊥)) => // ? [malloc].
   rewrite /Vector.nth_order /= => upd_r3 wf_st l f1 f2.
   move: wf_st => /(_ l f1 f2) /=.
   rewrite (reachable_alloc_int alloc_i) !inE => wf_st.
@@ -563,7 +564,7 @@ Lemma indist_registerContent_aux obs rs1 rs2 r :
 Proof.
   rewrite /registerContent.
   rewrite /indist /indistList /nth_error_Z.
-  case: (BinInt.Z.ltb r 0) => //=.
+  case: (BinInt.Z.ltb r BinNums.Z0) => //=.
   elim: {r} (BinInt.Z.to_nat r) rs1 rs2
         => [|n IH] [|x xs] [|y ys] //=.
   - by case/and3P.
@@ -595,7 +596,7 @@ Lemma indist_registerUpdate_aux obs rs1 rs2 r v1 v2 :
   indist obs (registerUpdate rs1 r v1) (registerUpdate rs2 r v2).
 Proof.
   rewrite /registerUpdate /update_list_Z.
-  case: (BinInt.Z.ltb r 0) => //=.
+  case: (BinInt.Z.ltb r BinNums.Z0) => //=.
   elim: {r} (BinInt.Z.to_nat r) rs1 rs2
         => [|n IH] [|x xs] [|y ys] //=.
   - rewrite /indist /= /indist /indistList //= /indist.
@@ -635,10 +636,10 @@ by move=> i l; case/and3P: i=> [_ _]; rewrite l /= => /and3P [/eqP ->].
 Qed.
 
 Lemma pc_eqS pc pc' l1 l2 :
-  (PAtm (BinInt.Z.add pc 1) l1 == PAtm (BinInt.Z.add pc' 1) l2) =
+  (PAtm (BinInt.Z.add pc (BinNums.Zpos BinNums.xH)) l1 == PAtm (BinInt.Z.add pc' (BinNums.Zpos BinNums.xH)) l2) =
   (PAtm pc l1 == PAtm pc' l2).
 Proof.
-by apply/eqP/eqP=> [[? ->]|[-> ->] //]; congr PAtm; omega.
+by apply/eqP/eqP=> [[? ->]|[-> ->] //]; congr PAtm; lia.
 Qed.
 
 Lemma indist_pcl obs st1 st2 :
@@ -858,8 +859,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
   + move=> im μ μ' σ pc rs rs' r1 r2 r3 i K Ll K' rl rpcl j LPC dfp -> /= CODE
            get_r1 get_r2 [<- <-] alloc_i.
     move: alloc_i get_r1; rewrite /alloc /zreplicate.
-    case: (ZArith_dec.Z_lt_dec i 0) => [//|Pi] /=.
-    have {Pi} Pi: BinInt.Z.le 0 i by omega.
+    case: (ZArith_dec.Z_lt_dec i BinNums.Z0) => [//|Pi] /=.
+    have {Pi} Pi: BinInt.Z.le BinNums.Z0 i by lia.
     rewrite -{2}(Znat.Z2Nat.id _ Pi) {Pi}.
     move: (BinInt.Z.to_nat i) => {i} i [Halloc] get_r1.
     rewrite /Vector.nth_order /= => upd_r3 low_pc indist_s1s2 wf_s1.
@@ -874,7 +875,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     move=> alloc_i2; move: alloc_i2 indist_i.
     rewrite /alloc /zreplicate.
     case: ZArith_dec.Z_lt_dec=> [//|Pi2] /=.
-    have {Pi2} Pi2: BinInt.Z.le 0 i2 by omega.
+    have {Pi2} Pi2: BinInt.Z.le BinNums.Z0 i2 by lia.
     rewrite -{2}(Znat.Z2Nat.id _ Pi2) {Pi2}.
     move: (BinInt.Z.to_nat i2) => {i2} i2.
     case Halloc2: Memory.alloc=> [dfp2 μ2'].
@@ -926,7 +927,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
             by rewrite !flows_join low_K low_K' low_pc.
           by rewrite get_b; case: get_memframe.
         subst dfp2.
-        have ind: indist obs (Vptr (Ptr dfp 0) @ K \_/ K') (Vptr (Ptr dfp 0) @ K \_/ K').
+        have ind: indist obs (Vptr (Ptr dfp BinNums.Z0) @ K \_/ K') (Vptr (Ptr dfp BinNums.Z0) @ K \_/ K').
           exact: indistxx.
         move: (indist_registerUpdate_aux r3 indist_rs ind).
         rewrite upd_r3 upd_r32 {1}/indist /= => ->; rewrite andbT.
@@ -949,8 +950,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
         rewrite /indist /=.
         by rewrite (P _ _ _ _ _ _ _ ind1 Halloc Halloc2) (P _ _ _ _ _ _ _ ind2 Halloc2 Halloc).
       apply/andP; split; last first.
-        have indist_dfp: indist obs (Vptr (Ptr dfp 0) @ K \_/ K')
-                                    (Vptr (Ptr dfp2 0) @ K \_/ K').
+        have indist_dfp: indist obs (Vptr (Ptr dfp BinNums.Z0) @ K \_/ K')
+                                    (Vptr (Ptr dfp2 BinNums.Z0) @ K \_/ K').
           by rewrite /indist /= eqxx /= flows_join (negbTE hi_K') andbF.
         move: (indist_registerUpdate_aux r3 indist_rs indist_dfp).
         by rewrite upd_r3 upd_r32.
@@ -965,8 +966,8 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     case/andP: indist_μ=> [ind1 ind2].
     rewrite (P1 _ _ _ _ _ _ _ _ _ _ ind1 hiL hiL Halloc Halloc2).
     rewrite (P1 _ _ _ _ _ _ _ _ _ _ ind2 hiL hiL Halloc2 Halloc) /=.
-    have indist_dfp: indist obs (Vptr (Ptr dfp 0) @ K \_/ K')
-                                (Vptr (Ptr dfp2 0) @ K \_/ K').
+    have indist_dfp: indist obs (Vptr (Ptr dfp BinNums.Z0) @ K \_/ K')
+                                (Vptr (Ptr dfp2 BinNums.Z0) @ K \_/ K').
       by rewrite /indist /= eqxx /= flows_join (negbTE hi_K).
     move: (indist_registerUpdate_aux r3 indist_rs indist_dfp).
     by rewrite upd_r3 upd_r32.
@@ -1495,7 +1496,7 @@ constructor=> [obs s1 s2 s1' s2' wf_s1 wf_s2 low_pc indist_s1s2 /fstepP step1|o 
     rewrite /indist /= (negbTE high_pc) /= !indistxx andbT /=.
     move: alloc_i get_r1; rewrite /alloc /zreplicate.
     case: ZArith_dec.Z_lt_dec=> [//|Pi] /=.
-    have {Pi} Pi: BinInt.Z.le 0 i by omega.
+    have {Pi} Pi: BinInt.Z.le BinNums.Z0 i by lia.
     rewrite -{2}(Znat.Z2Nat.id _ Pi) {Pi}.
     move: (BinInt.Z.to_nat i) => {i} i [alloc_i] get_r1.
     have high_L: isHigh (K \_/ (K' \_/ LPC)) o by rewrite !flows_join (negbTE high_pc) !andbF.

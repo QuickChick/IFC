@@ -48,6 +48,7 @@ Definition prop_stamp_generation (st : State) : Checker :=
       end
     else checker false)).
 
+  (*
 (* This is trivial, but it was mentioned below so I've proved it *)
 Lemma prop_stamp_generation_equiv :
   semCheckable prop_stamp_generation <->
@@ -109,3 +110,4 @@ Abort.
 (*       by apply <- semBool. *)
 (*     + fold (semCheckable rejected). rewrite semResult. reflexivity. *)
 (* Qed. *)
+*)

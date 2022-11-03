@@ -14,7 +14,7 @@ Fixpoint break_expr n (e : rule_expr n) : list (rule_expr n) :=
 
 Fixpoint join_exprs n (es : list (rule_expr n)) : rule_expr n :=
   match es with
-  | nil => L_Bot n
+  | nil => L_Bot
   | e :: nil => e
   | e :: es' => L_Join e (join_exprs es')
   end.
@@ -29,7 +29,7 @@ Fixpoint break_scond n (c : rule_scond n) : list (rule_scond n) :=
 
 Fixpoint and_sconds n (cs : list (rule_scond n)) : rule_scond n :=
   match cs with
-  | nil => A_True n
+  | nil => A_True
   | c :: nil => c
   | c :: cs' => A_And c (and_sconds cs')
   end.
@@ -73,10 +73,10 @@ Example ex_mutate_expr :
     [L_Join eL2 eL3; L_Join eL1 eL3; L_Join eL1 eL2].
 Proof. reflexivity. Qed.
 
-Example ex_mutate_expr_var : mutate_expr eL1 = [L_Bot 3].
+Example ex_mutate_expr_var : mutate_expr eL1 = [@L_Bot 3].
 Proof. reflexivity. Qed.
 
-Example ex_mutate_expr_bot : mutate_expr (L_Bot 3) = [].
+Example ex_mutate_expr_bot : mutate_expr (@L_Bot 3) = [].
 Proof. compute. reflexivity. Qed.
 
 (* For the pc we move disjuncts to the result label;
@@ -173,7 +173,7 @@ Example ex_mutate_scond :
                                     A_And c13 c23].
 Proof. reflexivity. Qed.
 
-Example ex_mutate_scond_true : mutate_scond (A_True 3) = [].
+Example ex_mutate_scond_true : mutate_scond (@A_True 3) = [].
 Proof. reflexivity. Qed.
 
 Definition mutate_rule n (r : AllowModify n) : list (AllowModify n) :=

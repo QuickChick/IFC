@@ -10,6 +10,7 @@ Require Import Indist.
 Require Import Generation.
 
 Local Open Scope nat.
+Local Open Scope list.
 
 (* CH: old stuff about sets of prins
 Powerset returns the set as its first element, so ignore that

@@ -1,4 +1,4 @@
-From QuickChick Require Import QuickChick FMapWeakListInstances. 
+From QuickChick Require Import QuickChick.
 
 Require Import TestingCommon.
 
@@ -6,6 +6,8 @@ Require Import ZArith.
 
 From mathcomp Require Import ssreflect eqtype seq.
 Import LabelEqType.
+
+Local Open Scope nat_scope.
 
 (* ------------------------------------------------------ *)
 (* ---------------- Constants --------------------------- *)
@@ -180,13 +182,13 @@ Fixpoint groupRegisters (st : State) (rs : regSet)
   match rs with
     | nil => (dptr, cptr, num, lab)
     | (Vint i @ _) :: rs' =>
-      let cptr' := if (Z.leb 0 i && Z.ltb i (Z_of_nat (length (st_imem st))))%bool
+      let cptr' := if (Z.leb 0 i && Z.ltb i (Z_of_nat (List.length (st_imem st))))%bool
                    then n :: cptr else cptr in
-      groupRegisters st rs' dptr cptr' (n :: num) lab (Zsucc n)
+      groupRegisters st rs' dptr cptr' (n :: num) lab (Z.succ n)
     | (Vptr p @ _ ) :: rs' =>
-      groupRegisters st rs' (n :: dptr) cptr num lab (Zsucc n)
+      groupRegisters st rs' (n :: dptr) cptr num lab (Z.succ n)
     | (Vlab _ @ _) :: rs' =>
-      groupRegisters st rs' dptr cptr num (n :: lab) (Zsucc n)
+      groupRegisters st rs' dptr cptr num (n :: lab) (Z.succ n)
   end.
 
 Definition onNonEmpty {A : Type} (l : list A) (n : nat) :=
@@ -257,7 +259,7 @@ Definition ainstrSSNI (st : State) : G Instr :=
 Definition instantiate_instructions st : G State :=
   let '(St im m s r pc) := st in
   bindGen (ainstrSSNI st) (fun instr =>
-  let im' := nseq (length im) instr in
+  let im' := nseq (List.length im) instr in
   returnGen (St im' m s r pc)).
 
 (* ------------------------------------------------------ *)
@@ -384,6 +386,13 @@ Definition handle_single_mframe obs inf (m : memory) (mf : mframe)
       end)
     | None => returnGen m
   end.
+
+Fixpoint foldGen {A B : Type} (f : A -> B -> G A) (l : list B) (a : A)
+: G A := nosimpl(
+  match l with
+    | [::] => returnGen a
+    | (x :: xs) => bindGen (f a x) (foldGen f xs)
+  end).
 
 Definition gen_vary_memory  obs inf (m : memory)
 : G memory :=
@@ -546,7 +555,7 @@ Definition failed_state : State :=
 Definition populate_frame inf (m : memory) (mf : mframe) : G memory :=
   match get_memframe m mf with
     | Some (Fr lab data) =>
-      bindGen (vectorOf (length data) (smart_gen inf)) (fun data' =>
+      bindGen (vectorOf (List.length data) (smart_gen inf)) (fun data' =>
       match upd_memframe m mf (Fr lab data') with
         | Some m' => returnGen m'
         | _ => pure m
@@ -569,7 +578,7 @@ Definition get_blocks_and_sizes (m : memory) :=
     let length :=
         match get_memframe m b with
           | Some fr =>
-            let 'Fr _ data := fr in length data
+            let 'Fr _ data := fr in List.length data
           | _ => 0
         end in (b, Z.of_nat length)) (get_blocks all_labels m).
 
@@ -631,7 +640,8 @@ Derive GenSized for StackFrame.
 Derive GenSized for Stack.
 Derive GenSized for State.
 Derive GenSized for Variation.
-  
+
+(*
 Derive Fuzzy for BinOpT.
 Derive Fuzzy for Instr.
 Derive Fuzzy for Pointer.
@@ -642,6 +652,7 @@ Derive Fuzzy for StackFrame.
 Derive Fuzzy for Stack.
 Derive Fuzzy for State.
 Derive Fuzzy for Variation.
+ *)
 
 Definition gen_variation_copy : G (@Variation State) :=
   bindGen arbitrary (fun l  =>

@@ -31,4 +31,4 @@ Class ShrinkV (A : Type) := { shrinkV : @Variation A -> list (@Variation A) }.
 
 Definition validJump (st : State) (addr : Z) :=
   let '(St imem _ _ _ _) := st in
-  (Z.to_nat addr) <? (List.length imem).
+  ((Z.to_nat addr) <? (List.length imem))%nat.

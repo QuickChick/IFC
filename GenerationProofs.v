@@ -9,6 +9,8 @@ Require Import GenerationProofsHelpers.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 
 
+Local Open Scope nat.
+Local Open Scope list.
 
 (* The old version of the semantics for sequence is preferrable for these proofs *)
 Lemma Forall2_combine : forall {A} n (gs : list (G A)) l,
@@ -26,7 +28,7 @@ Proof.
 Qed.
 
 Lemma seqzip__Forall2 : forall {A} n (gs : list (G A)) l,
-  length l == length gs ->
+    List.length l == List.length gs ->
   (forall x, List.In x (seq.zip l gs) -> semGenSize (snd x) n (fst x)) ->
   List.Forall2 (fun y => semGenSize y n) gs l.
 Proof.

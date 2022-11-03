@@ -209,5 +209,4 @@ Proof. by case. Defined.
 From QuickChick Require Import QuickChick.
 Derive Show for Label.
 Derive Arbitrary for Label.
-Derive Fuzzy for Label.
-
+(* Derive Fuzzy for Label.*)
